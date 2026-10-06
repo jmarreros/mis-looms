@@ -1,0 +1,10 @@
+# Laravel (Fase 2)
+/server/vendor/
+/server/node_modules/
+/server/.env
+
+# Editores / SO
+.idea/
+.vscode/
+*.swp
+.DS_Store
