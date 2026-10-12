@@ -8,3 +8,7 @@
 .vscode/
 *.swp
 .DS_Store
+
+# macOS (Swift)
+/macos/.build/
+/macos/build/

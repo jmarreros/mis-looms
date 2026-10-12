@@ -6,6 +6,7 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
 
 - Plan completo de arquitectura y fases: [docs/PLAN.md](docs/PLAN.md)
 - Hallazgos de la captura en Linux: [docs/linux-captura.md](docs/linux-captura.md)
+- App de macOS (compilar sin Xcode, uso): [macos/README.md](macos/README.md)
 - App de Linux (dependencias, compilar, uso): [linux/README.md](linux/README.md)
 
 ## Decisiones tomadas
@@ -29,6 +30,16 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
 - GStreamer → MP4 H.264 (x264) + AAC (fdkaac), faststart, escalado a 1080p,
   8 Mbps. Videos en `~/Videos/mis-looms/`.
 - Pendiente de confirmar: que las notificaciones se vean tras el último arreglo.
+
+**App macOS (adelantada, 2026-10-12) — HECHA y probada.** `macos/`: paquete SwiftPM (sin
+Xcode, solo Command Line Tools), app de barra de menú, ScreenCaptureKit + AVAssetWriter.
+Atajos globales ⌥⇧L (iniciar) y ⌘⇧L (finalizar). MP4 H.264 + AAC estéreo, ≤1080p,
+faststart, en `~/Movies/mis-looms/` (verificado con ffprobe). Audio del sistema
+desactivado por defecto (opción de menú; sin mezclar aún, ver TODO en `Recorder.swift`).
+Compilar: `macos/crear-certificado.sh` (una vez) + `macos/compilar.sh`; el certificado
+"Mis Looms Dev" mantiene los permisos entre compilaciones. Detalles: [macos/README.md](macos/README.md).
+Pendiente: mezclar audio del sistema en una sola pista; cuenta regresiva y pausa; la
+subida a S3 va después de la API (Fase 3, mismo contrato).
 
 **Siguiente: Fase 2** — S3 + API Laravel 13 en `server/` + página pública Blade
 `/v/{slug}`. Probar con `curl` y un MP4 de la Fase 1.

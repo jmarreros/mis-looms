@@ -1,0 +1,215 @@
+import AVFoundation
+import ScreenCaptureKit
+
+enum RecorderError: LocalizedError {
+    case sinPantalla
+    case escritor(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .sinPantalla: return "No se encontró ninguna pantalla para grabar."
+        case .escritor(let detalle): return "Error al escribir el video: \(detalle)"
+        }
+    }
+}
+
+/// Graba la pantalla principal completa + micrófono (+ audio del sistema opcional)
+/// a un MP4 H.264 + AAC con ScreenCaptureKit y AVAssetWriter.
+final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
+    static let anchoMaximo = 1920
+    static let altoMaximo = 1080
+    static let bitrate = 8_000_000
+    static let fps = 30
+
+    /// Se invoca (en un hilo cualquiera) si la captura se detiene sola por un error.
+    var alDetenerseConError: ((Error) -> Void)?
+
+    private let cola = DispatchQueue(label: "org.mislooms.captura")
+    private var stream: SCStream?
+    private var escritor: AVAssetWriter?
+    private var entradaVideo: AVAssetWriterInput?
+    private var entradaMicrofono: AVAssetWriterInput?
+    private var entradaSistema: AVAssetWriterInput?
+    private var sesionIniciada = false
+    private var finalizando = false
+
+    private(set) var archivo: URL?
+
+    var grabando: Bool { stream != nil }
+
+    // MARK: - Inicio
+
+    func iniciar(destino: URL, audioDelSistema: Bool) async throws {
+        // Lanza el diálogo de permiso de Grabación de pantalla la primera vez.
+        let contenido = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        let principal = CGMainDisplayID()
+        guard let pantalla = contenido.displays.first(where: { $0.displayID == principal })
+                ?? contenido.displays.first else { throw RecorderError.sinPantalla }
+
+        let filtro = SCContentFilter(display: pantalla, excludingWindows: [])
+        let (ancho, alto) = Self.dimensiones(pantalla: pantalla, filtro: filtro)
+
+        let config = SCStreamConfiguration()
+        config.width = ancho
+        config.height = alto
+        config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(Self.fps))
+        config.showsCursor = true
+        config.queueDepth = 6
+        config.capturesAudio = audioDelSistema
+        config.excludesCurrentProcessAudio = true
+        config.captureMicrophone = true
+        config.sampleRate = 48_000
+        config.channelCount = 2
+
+        try prepararEscritor(destino: destino, ancho: ancho, alto: alto, audioDelSistema: audioDelSistema)
+
+        let nuevo = SCStream(filter: filtro, configuration: config, delegate: self)
+        try nuevo.addStreamOutput(self, type: .screen, sampleHandlerQueue: cola)
+        try nuevo.addStreamOutput(self, type: .microphone, sampleHandlerQueue: cola)
+        if audioDelSistema {
+            try nuevo.addStreamOutput(self, type: .audio, sampleHandlerQueue: cola)
+        }
+        try await nuevo.startCapture()
+        stream = nuevo
+        archivo = destino
+    }
+
+    /// Resolución de salida: píxeles reales de la pantalla reducidos a 1080p máx., en pares.
+    private static func dimensiones(pantalla: SCDisplay, filtro: SCContentFilter) -> (Int, Int) {
+        let escala = Double(filtro.pointPixelScale)
+        let nativoAncho = Double(pantalla.width) * escala
+        let nativoAlto = Double(pantalla.height) * escala
+        let factor = min(1, Double(anchoMaximo) / nativoAncho, Double(altoMaximo) / nativoAlto)
+        let par = { (v: Double) in max(2, Int((v * factor).rounded()) & ~1) }
+        return (par(nativoAncho), par(nativoAlto))
+    }
+
+    private func prepararEscritor(destino: URL, ancho: Int, alto: Int, audioDelSistema: Bool) throws {
+        try? FileManager.default.removeItem(at: destino)
+        let w = try AVAssetWriter(outputURL: destino, fileType: .mp4)
+        // moov al inicio (faststart): el video se reproduce sin descargarlo entero.
+        w.shouldOptimizeForNetworkUse = true
+
+        let video = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: ancho,
+            AVVideoHeightKey: alto,
+            AVVideoCompressionPropertiesKey: [
+                AVVideoAverageBitRateKey: Self.bitrate,
+                AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel,
+                AVVideoMaxKeyFrameIntervalDurationKey: 2,
+                AVVideoExpectedSourceFrameRateKey: Self.fps,
+            ],
+        ])
+        video.expectsMediaDataInRealTime = true
+        w.add(video)
+
+        let ajustesAudio: [String: Any] = [
+            AVFormatIDKey: kAudioFormatMPEG4AAC,
+            AVSampleRateKey: 48_000,
+            AVNumberOfChannelsKey: 2,
+            AVEncoderBitRateKey: 128_000,
+        ]
+        let micro = AVAssetWriterInput(mediaType: .audio, outputSettings: ajustesAudio)
+        micro.expectsMediaDataInRealTime = true
+        w.add(micro)
+
+        // TODO(mezcla): con audio del sistema se escribe como segunda pista. El <video> web
+        // solo reproduce la primera; para el enlace público habrá que mezclarlas en una.
+        var sistema: AVAssetWriterInput?
+        if audioDelSistema {
+            let e = AVAssetWriterInput(mediaType: .audio, outputSettings: ajustesAudio)
+            e.expectsMediaDataInRealTime = true
+            w.add(e)
+            sistema = e
+        }
+
+        guard w.startWriting() else {
+            throw RecorderError.escritor(w.error?.localizedDescription ?? "no se pudo iniciar")
+        }
+        escritor = w
+        entradaVideo = video
+        entradaMicrofono = micro
+        entradaSistema = sistema
+        sesionIniciada = false
+        finalizando = false
+    }
+
+    // MARK: - Fin
+
+    /// Detiene la captura, cierra el MP4 y devuelve su ruta.
+    func detener() async throws -> URL {
+        if let stream {
+            try? await stream.stopCapture()
+            self.stream = nil
+        }
+        return try await finalizar()
+    }
+
+    private func finalizar() async throws -> URL {
+        let url = archivo
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            cola.async {
+                guard let w = self.escritor, !self.finalizando else { cont.resume(); return }
+                self.finalizando = true
+                guard self.sesionIniciada else {
+                    w.cancelWriting()
+                    cont.resume()
+                    return
+                }
+                self.entradaVideo?.markAsFinished()
+                self.entradaMicrofono?.markAsFinished()
+                self.entradaSistema?.markAsFinished()
+                w.finishWriting { cont.resume() }
+            }
+        }
+        defer {
+            escritor = nil; entradaVideo = nil; entradaMicrofono = nil; entradaSistema = nil
+        }
+        if let w = escritor, w.status == .failed {
+            throw RecorderError.escritor(w.error?.localizedDescription ?? "desconocido")
+        }
+        guard let url, sesionIniciada else {
+            throw RecorderError.escritor("no se capturó ningún fotograma")
+        }
+        return url
+    }
+
+    // MARK: - SCStreamOutput
+
+    func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of tipo: SCStreamOutputType) {
+        guard buffer.isValid, !finalizando, let w = escritor, w.status == .writing else { return }
+
+        switch tipo {
+        case .screen:
+            guard Self.fotogramaCompleto(buffer), let entrada = entradaVideo else { return }
+            if !sesionIniciada {
+                w.startSession(atSourceTime: buffer.presentationTimeStamp)
+                sesionIniciada = true
+            }
+            if entrada.isReadyForMoreMediaData { entrada.append(buffer) }
+        case .microphone:
+            guard sesionIniciada, let entrada = entradaMicrofono, entrada.isReadyForMoreMediaData else { return }
+            entrada.append(buffer)
+        case .audio:
+            guard sesionIniciada, let entrada = entradaSistema, entrada.isReadyForMoreMediaData else { return }
+            entrada.append(buffer)
+        @unknown default:
+            break
+        }
+    }
+
+    /// ScreenCaptureKit también entrega buffers "idle"/"blank" sin imagen: se descartan.
+    private static func fotogramaCompleto(_ buffer: CMSampleBuffer) -> Bool {
+        guard let adjuntos = CMSampleBufferGetSampleAttachmentsArray(buffer, createIfNecessary: false) as? [[SCStreamFrameInfo: Any]],
+              let estado = adjuntos.first?[.status] as? Int else { return false }
+        return estado == SCFrameStatus.complete.rawValue
+    }
+
+    // MARK: - SCStreamDelegate
+
+    func stream(_ stream: SCStream, didStopWithError error: Error) {
+        self.stream = nil
+        alDetenerseConError?(error)
+    }
+}
