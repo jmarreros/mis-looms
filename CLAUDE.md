@@ -5,6 +5,7 @@ del sistema opcional), suben el MP4 directo a S3 con multipart prefirmado por La
 y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
 
 - Plan completo de arquitectura y fases: [docs/PLAN.md](docs/PLAN.md)
+- API de las apps y despliegue del servidor: [docs/api.md](docs/api.md), [docs/despliegue.md](docs/despliegue.md)
 - Hallazgos de la captura en Linux: [docs/linux-captura.md](docs/linux-captura.md)
 - App de macOS (compilar sin Xcode, uso): [macos/README.md](macos/README.md)
 - App de Linux (dependencias, compilar, uso): [linux/README.md](linux/README.md)
@@ -41,11 +42,21 @@ Compilar: `macos/crear-certificado.sh` (una vez) + `macos/compilar.sh`; el certi
 Pendiente: mezclar audio del sistema en una sola pista; cuenta regresiva y pausa; la
 subida a S3 va después de la API (Fase 3, mismo contrato).
 
-**Siguiente: Fase 2** — S3 + API Laravel 13 en `server/` + página pública Blade
-`/v/{slug}`. Probar con `curl` y un MP4 de la Fase 1.
+**Fase 2 — HECHA (2026-10-12).** S3 configurado y verificado (`mis-looms-jmarreros`,
+us-east-1) y backend Laravel 13.35 en `server/` (Blade puro, CSS a mano sin Vite/Node):
+API Sanctum multipart (`docs/api.md`), página pública `/v/{slug}` con Open Graph, panel
+(login, listado con búsqueda, renombrar, eliminar con borrado en S3, token de la app),
+comandos `mislooms:crear-usuario` y `mislooms:limpiar-subidas` (cron horario). 23 pruebas
+PHPUnit con almacenamiento falso; flujo real probado contra S3 (1 y 2 partes, abort).
+Despliegue y desarrollo: `docs/despliegue.md`. Pendiente: rellenar claves del usuario IAM
+`mis-looms-laravel` en `server/.env` y desplegar en cPanel.
+
+**Siguiente: Fase 3** — subida desde las apps (macOS primero, ya existe): cliente
+multipart con progreso y reintentos, miniatura, enlace al portapapeles, URL + token en
+Keychain.
 
 **Después:**
-- Fase 3: subida desde la app de Linux (multipart con progreso y reintentos,
+- Fase 3 (también Linux): subida desde la app de Linux (multipart con progreso y reintentos,
   miniatura, enlace al portapapeles, notificación, ventana de configuración GTK4
   con URL + token en el keyring).
 - Fase 4: panel de administración en Blade.
