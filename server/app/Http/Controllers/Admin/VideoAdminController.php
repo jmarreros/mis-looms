@@ -22,7 +22,12 @@ class VideoAdminController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        return view('admin.videos', ['videos' => $videos, 'busqueda' => $busqueda]);
+        return view('admin.videos', ['videos' => $videos, 'busqueda' => $busqueda, 'total' => Video::count()]);
+    }
+
+    public function show(Video $video)
+    {
+        return view('admin.video', ['video' => $video]);
     }
 
     public function update(Request $request, Video $video): RedirectResponse
@@ -37,6 +42,7 @@ class VideoAdminController extends Controller
     {
         $video->eliminarCompleto($almacen);
 
-        return back()->with('estado', 'Video eliminado.');
+        // Se elimina desde su página de detalle, que ya no existe: volver al listado.
+        return redirect()->route('admin.videos.index')->with('estado', 'Video eliminado.');
     }
 }

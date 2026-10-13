@@ -3,8 +3,8 @@
   <defs>
     <!-- Degradado en coordenadas absolutas para que el recorte de la insignia se funda con el fondo -->
     <linearGradient id="fondo" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512">
-      <stop offset="0" stop-color="#6A9BD8"/>
-      <stop offset="1" stop-color="#33639E"/>
+      <stop offset="0" stop-color="#F6A06B"/>
+      <stop offset="1" stop-color="#B2622D"/>
     </linearGradient>
   </defs>
   <!-- Fondo del icono -->

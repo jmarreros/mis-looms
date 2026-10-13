@@ -12,3 +12,6 @@
 # macOS (Swift)
 /macos/.build/
 /macos/build/
+
+# Diseño de referencia descargado de Claude Design (no se versiona)
+/diseño-mis-looms-web/

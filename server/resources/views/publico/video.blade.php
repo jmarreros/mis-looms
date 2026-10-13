@@ -27,20 +27,20 @@
     @endif
     <meta name="twitter:title" content="{{ $video->titulo() }}">
 
-    <link rel="icon" type="image/svg+xml" href="{{ asset('logo.svg') }}">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    @include('partials.estilos')
 </head>
-<body class="pagina-publica">
-<main>
-    <div class="contenedor">
-        <video class="reproductor" controls autoplay playsinline preload="metadata"
-               @if ($video->urlMiniatura()) poster="{{ $video->urlMiniatura() }}" @endif
-               src="{{ $video->urlVideo() }}"></video>
+<body>
+<main class="publica">
+    <span class="marca"><img src="{{ asset('logo.svg') }}" alt="">{{ config('app.name') }}</span>
+    <video class="reproductor" controls autoplay playsinline preload="metadata"
+           @if ($video->urlMiniatura()) poster="{{ $video->urlMiniatura() }}" @endif
+           src="{{ $video->urlVideo() }}"></video>
+    <div class="titulo-pagina">
         <h1>{{ $video->titulo() }}</h1>
-        <p class="meta">
-            {{ $video->created_at->format('d/m/Y') }}
+        <span class="suave">
+            {{ $video->created_at->translatedFormat('j M Y') }}
             · {{ $video->views }} {{ $video->views === 1 ? 'vista' : 'vistas' }}
-        </p>
+        </span>
     </div>
 </main>
 </body>

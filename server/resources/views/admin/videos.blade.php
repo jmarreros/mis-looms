@@ -2,68 +2,60 @@
 @section('titulo', 'Videos')
 
 @section('contenido')
-    <h1>Videos</h1>
+    <div class="titulo-pagina">
+        <h1>Videos</h1>
+        <span class="suave">
+            @if ($total === 0)
+                Sin videos
+            @elseif ($busqueda !== '')
+                {{ $videos->total() }} de {{ $total }} videos
+            @else
+                {{ $total }} {{ $total === 1 ? 'video' : 'videos' }}
+            @endif
+        </span>
+    </div>
 
-    <form class="buscador" method="GET" action="{{ route('admin.videos.index') }}">
-        <input type="search" name="q" value="{{ $busqueda }}" placeholder="Buscar por título o código">
-        <button type="submit">Buscar</button>
-    </form>
+    @if ($total > 0)
+        <form class="buscador" method="GET" action="{{ route('admin.videos.index') }}" role="search">
+            @include('partials.icono', ['nombre' => 'buscar', 'tam' => 18, 'color' => 'var(--neutro-500)'])
+            <input type="search" name="q" value="{{ $busqueda }}" placeholder="Buscar por título o código" aria-label="Buscar">
+            @if ($busqueda !== '')
+                <a class="boton discreto chico" href="{{ route('admin.videos.index') }}" style="background: var(--neutro-800)">Limpiar</a>
+            @endif
+        </form>
+    @endif
 
-    @if ($videos->isEmpty())
-        <p class="vacio">{{ $busqueda !== '' ? 'No hay videos que coincidan.' : 'Todavía no has subido ningún video.' }}</p>
+    @if ($total === 0)
+        <div class="vacio">
+            <div class="vacio-dibujo"><span>@include('partials.icono', ['nombre' => 'play', 'tam' => 22, 'color' => 'var(--acento-500)'])</span></div>
+            <div class="texto">
+                <h2>Todavía no has subido ningún video.</h2>
+                <p class="suave">Conecta la app de grabación con tu token y tus videos aparecerán aquí en cuanto termines de grabar.</p>
+                <a class="boton primario" href="{{ route('admin.token') }}">Ver mi token</a>
+            </div>
+        </div>
+    @elseif ($videos->isEmpty())
+        <div class="sin-resultados">
+            <div class="icono-circulo">@include('partials.icono', ['nombre' => 'buscar', 'tam' => 34, 'color' => 'var(--neutro-500)'])</div>
+            <h2>Sin resultados para “{{ $busqueda }}”</h2>
+            <p class="suave">Prueba con otra palabra del título o con el código del video.</p>
+        </div>
     @else
         <div class="rejilla">
             @foreach ($videos as $video)
-                <article class="video">
-                    <div class="miniatura" @if ($video->urlMiniatura()) style="background-image:url('{{ $video->urlMiniatura() }}')" @endif>
-                        @unless ($video->urlMiniatura()) Sin miniatura @endunless
-                    </div>
-                    <div class="cuerpo">
-                        <h2>{{ $video->titulo() }}</h2>
-                        <div class="meta">
-                            <span class="insignia {{ $video->status }}">
-                                {{ ['ready' => 'Listo', 'uploading' => 'Subiendo', 'failed' => 'Fallido'][$video->status] ?? $video->status }}
-                            </span>
-                            · {{ $video->duracionLegible() }} · {{ $video->tamanoLegible() }}
-                            · {{ $video->views }} {{ $video->views === 1 ? 'vista' : 'vistas' }}
-                            · {{ $video->created_at->format('d/m/Y H:i') }}
-                        </div>
-                        <div class="acciones">
-                            @if ($video->estaListo())
-                                <a class="boton" href="{{ $video->urlCompartir() }}" target="_blank" rel="noopener">Abrir</a>
-                                <button type="button" data-copiar="{{ $video->urlCompartir() }}">Copiar enlace</button>
-                            @endif
-                            <form method="POST" action="{{ route('admin.videos.destroy', $video) }}"
-                                  onsubmit="return confirm('¿Eliminar este video? Se borrará también de S3.')">
-                                @csrf @method('DELETE')
-                                <button class="peligro" type="submit">Eliminar</button>
-                            </form>
-                        </div>
-                        <details class="renombrar">
-                            <summary class="meta">Renombrar</summary>
-                            <form method="POST" action="{{ route('admin.videos.update', $video) }}">
-                                @csrf @method('PATCH')
-                                <input type="text" name="title" value="{{ $video->title }}" maxlength="255" placeholder="Título">
-                                <button type="submit">Guardar</button>
-                            </form>
-                        </details>
-                    </div>
-                </article>
+                <a class="tarjeta-video" href="{{ route('admin.videos.show', $video) }}">
+                    @include('partials.miniatura', ['video' => $video])
+                    <span class="info">
+                        <span class="titulo">{{ $video->titulo() }}</span>
+                        <span class="meta">
+                            <span class="codigo">{{ $video->slug }}</span>
+                            {{ $video->created_at->translatedFormat('j M Y') }} · {{ $video->views }} {{ $video->views === 1 ? 'vista' : 'vistas' }}
+                        </span>
+                    </span>
+                </a>
             @endforeach
         </div>
 
         {{ $videos->links('pagination.mislooms') }}
     @endif
-
-    <script>
-        document.querySelectorAll('[data-copiar]').forEach(function (boton) {
-            boton.addEventListener('click', function () {
-                navigator.clipboard.writeText(boton.dataset.copiar).then(function () {
-                    var texto = boton.textContent;
-                    boton.textContent = '¡Copiado!';
-                    setTimeout(function () { boton.textContent = texto; }, 1500);
-                });
-            });
-        });
-    </script>
 @endsection

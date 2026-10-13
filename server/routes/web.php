@@ -23,6 +23,7 @@ Route::post('/logout', [LoginController::class, 'salir'])->middleware('auth')->n
 // Panel de administración.
 Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [VideoAdminController::class, 'index'])->name('videos.index');
+    Route::get('/videos/{video:slug}', [VideoAdminController::class, 'show'])->name('videos.show');
     Route::patch('/videos/{video:slug}', [VideoAdminController::class, 'update'])->name('videos.update');
     Route::delete('/videos/{video:slug}', [VideoAdminController::class, 'destroy'])->name('videos.destroy');
     Route::get('/token', [TokenController::class, 'show'])->name('token');

@@ -1,35 +1,66 @@
 @extends('layouts.admin')
 @section('titulo', 'Token de la app')
+@section('estrecho', true)
 
 @section('contenido')
-    <h1>Token de la app</h1>
+    @php($activo = $tokens->first())
+    <div class="titulo-pagina">
+        <h1>Token de la app</h1>
+        <p>Pega este token en la app de grabación para que tus videos se suban a tu cuenta. No lo compartas con nadie.</p>
+    </div>
 
-    <div class="tarjeta">
-        <p>Las apps de Mac y Linux usan este token para subir videos. Pégalo en su configuración junto con
-            la URL del servidor: <strong>{{ url('/') }}</strong></p>
-
+    <div class="superficie token">
         @if (session('token_nuevo'))
-            <div class="aviso-ok">
-                Copia el token ahora: no se volverá a mostrar.
+            <div class="copiable">
+                <span class="valor">{{ session('token_nuevo') }}</span>
+                <button class="boton primario" type="button" data-copiar="{{ session('token_nuevo') }}">Copiar</button>
             </div>
-            <code class="token">{{ session('token_nuevo') }}</code>
-        @else
-            <p class="meta">
-                @if ($tokens->isEmpty())
-                    Todavía no hay ningún token activo.
-                @else
-                    Token activo creado el {{ $tokens->first()->created_at->format('d/m/Y H:i') }}.
-                    @if ($tokens->first()->last_used_at)
-                        Último uso: {{ $tokens->first()->last_used_at->format('d/m/Y H:i') }}.
-                    @endif
-                @endif
-            </p>
+            <p class="suave" style="font-size: 14px">Cópialo ahora: por seguridad solo se guarda cifrado y no se volverá a mostrar.</p>
+        @elseif ($activo)
+            <div class="copiable">
+                <span class="valor suave">{{ $activo->id }}|••••••••••••••••••••••••••••••••</span>
+            </div>
         @endif
 
-        <form method="POST" action="{{ route('admin.token.regenerar') }}" style="margin-top:16px"
-              onsubmit="return confirm('Se revocará el token actual y las apps dejarán de funcionar hasta que pegues el nuevo. ¿Continuar?')">
-            @csrf
-            <button class="primario" type="submit">{{ $tokens->isEmpty() ? 'Generar token' : 'Regenerar token' }}</button>
-        </form>
+        <div class="pie">
+            <span>
+                @if ($activo)
+                    Creado el {{ $activo->created_at->translatedFormat('j M Y') }}
+                    · {{ $activo->last_used_at ? 'Último uso '.$activo->last_used_at->diffForHumans() : 'Sin usar todavía' }}
+                @else
+                    Todavía no hay ningún token activo.
+                @endif
+            </span>
+            @if ($activo)
+                <button class="boton chico" type="button" onclick="document.getElementById('confirmar-token').showModal()">
+                    @include('partials.icono', ['nombre' => 'regenerar', 'tam' => 15]) Generar uno nuevo
+                </button>
+            @else
+                <form method="POST" action="{{ route('admin.token.regenerar') }}">
+                    @csrf
+                    <button class="boton primario" type="submit">Generar token</button>
+                </form>
+            @endif
+        </div>
     </div>
+
+    <ol class="pasos">
+        <li><span>Abre la app de grabación (Mac o Linux) y entra en su configuración.</span></li>
+        <li><span>Pega la URL del servidor, <strong>{{ url('/') }}</strong>, y este token.</span></li>
+        <li><span>Graba. Al terminar, el video aparecerá en <a href="{{ route('admin.videos.index') }}">Videos</a>.</span></li>
+    </ol>
+
+    @if ($activo)
+        <dialog class="confirmar" id="confirmar-token">
+            <h2>¿Generar un token nuevo?</h2>
+            <p>El token actual dejará de funcionar y las apps no podrán subir videos hasta que pegues el nuevo.</p>
+            <div class="botones">
+                <button class="boton" type="button" onclick="this.closest('dialog').close()">Cancelar</button>
+                <form method="POST" action="{{ route('admin.token.regenerar') }}">
+                    @csrf
+                    <button class="boton primario" type="submit">Generar</button>
+                </form>
+            </div>
+        </dialog>
+    @endif
 @endsection

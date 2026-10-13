@@ -5,29 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
     <title>Acceso · {{ config('app.name') }}</title>
-    <link rel="icon" type="image/svg+xml" href="{{ asset('logo.svg') }}">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    @include('partials.estilos')
 </head>
 <body>
-<div class="contenedor">
-    <form class="tarjeta login" method="POST" action="{{ route('login') }}">
-        @csrf
-        <img class="logo-login" src="{{ asset('logo.svg') }}" alt="" width="56" height="56">
-        <h1>{{ config('app.name') }}</h1>
-        <div class="campo">
-            <label for="email">Correo</label>
-            <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus autocomplete="username">
+<div class="login">
+    <div class="login-panel">
+        <span class="marca"><img src="{{ asset('logo.svg') }}" alt="">{{ config('app.name') }}</span>
+        <div class="login-intro">
+            <h1>Tus grabaciones, en un solo lugar.</h1>
+            <p>Entra para ver, compartir y organizar los videos que grabas desde la app.</p>
+        </div>
+        <form method="POST" action="{{ route('login') }}">
+            @csrf
+            <label class="campo">
+                Correo electrónico
+                <input class="entrada" type="email" name="email" value="{{ old('email') }}" placeholder="tu@correo.com"
+                       required autofocus autocomplete="username">
+            </label>
             @error('email') <div class="error">{{ $message }}</div> @enderror
+            <label class="campo">
+                Contraseña
+                <input class="entrada" type="password" name="password" placeholder="••••••••" required autocomplete="current-password">
+            </label>
+            <label class="casilla"><input type="checkbox" name="recordar" value="1"> Mantener la sesión</label>
+            <button class="boton primario grande" type="submit">Entrar</button>
+        </form>
+    </div>
+    <div class="ilustracion" aria-hidden="true">
+        <div class="circulo c1"></div>
+        <div class="circulo c2"></div>
+        <div class="pantalla">
+            <div class="boton-play">@include('partials.icono', ['nombre' => 'play', 'tam' => 28, 'color' => '#1c1a17'])</div>
+            <div class="etiqueta-grabando"><span class="punto"></span>Grabando · 02:14</div>
         </div>
-        <div class="campo">
-            <label for="password">Contraseña</label>
-            <input id="password" type="password" name="password" required autocomplete="current-password">
-        </div>
-        <div class="campo">
-            <label><input type="checkbox" name="recordar" value="1"> Mantener la sesión</label>
-        </div>
-        <button class="primario" type="submit">Entrar</button>
-    </form>
+    </div>
 </div>
 </body>
 </html>

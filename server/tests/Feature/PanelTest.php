@@ -112,6 +112,27 @@ class PanelTest extends TestCase
             ->assertDontSee('Reunión de equipo');
     }
 
+    public function test_listado_vacio_y_sin_resultados(): void
+    {
+        $usuario = User::factory()->create();
+        $this->actingAs($usuario)->get('/admin')->assertOk()->assertSee('Todavía no has subido ningún video.');
+
+        $this->video(['title' => 'Reunión de equipo']);
+        $this->actingAs($usuario)->get('/admin?q=zzz')->assertOk()->assertSee('Sin resultados para');
+    }
+
+    public function test_detalle_del_video(): void
+    {
+        $v = $this->video(['title' => 'Mi demo', 'width' => 1920, 'height' => 1080]);
+
+        $this->actingAs(User::factory()->create())
+            ->get("/admin/videos/{$v->slug}")
+            ->assertOk()
+            ->assertSee('Mi demo')
+            ->assertSee($v->urlCompartir())
+            ->assertSee('1920 × 1080');
+    }
+
     public function test_renombrar(): void
     {
         $v = $this->video(['title' => 'Antes']);
@@ -127,7 +148,7 @@ class PanelTest extends TestCase
     {
         $v = $this->video(['thumbnail_key' => 'thumbs/abc.jpg']);
 
-        $this->actingAs(User::factory()->create())->delete("/admin/videos/{$v->slug}")->assertRedirect();
+        $this->actingAs(User::factory()->create())->delete("/admin/videos/{$v->slug}")->assertRedirect('/admin');
 
         $this->assertDatabaseMissing('videos', ['id' => $v->id]);
         $this->assertSame([$v->s3_key, 'thumbs/abc.jpg'], $this->almacen->borrados);

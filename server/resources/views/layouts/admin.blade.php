@@ -5,32 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
     <title>@yield('titulo', 'Panel') · {{ config('app.name') }}</title>
-    <link rel="icon" type="image/svg+xml" href="{{ asset('logo.svg') }}">
-    <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    @include('partials.estilos')
 </head>
 <body>
 <header class="cabecera">
-    <div class="contenedor">
-        <a class="marca" href="{{ route('admin.videos.index') }}">
-            <img src="{{ asset('logo.svg') }}" alt="" width="28" height="28">{{ config('app.name') }}
-        </a>
-        <nav>
-            <a href="{{ route('admin.videos.index') }}" @class(['activo' => request()->routeIs('admin.videos.*')])>Videos</a>
-            <a href="{{ route('admin.token') }}" @class(['activo' => request()->routeIs('admin.token*')])>Token de la app</a>
-        </nav>
+    <a class="marca" href="{{ route('admin.videos.index') }}">
+        <img src="{{ asset('logo.svg') }}" alt="">{{ config('app.name') }}
+    </a>
+    <nav class="pestanas">
+        <a href="{{ route('admin.videos.index') }}" @class(['activo' => request()->routeIs('admin.videos.*')])>Videos</a>
+        <a href="{{ route('admin.token') }}" @class(['activo' => request()->routeIs('admin.token*')])>Token de la app</a>
+    </nav>
+    <div class="cuenta">
+        <span class="avatar" title="{{ auth()->user()->email }}">{{ mb_strtoupper(mb_substr(auth()->user()->name ?: auth()->user()->email, 0, 1)) }}</span>
         <form method="POST" action="{{ route('logout') }}">
             @csrf
-            <button class="enlace" type="submit">Salir</button>
+            <button class="boton chico" type="submit">@include('partials.icono', ['nombre' => 'salir']) Salir</button>
         </form>
     </div>
 </header>
-<main>
-    <div class="contenedor">
-        @if (session('estado'))
-            <div class="aviso-ok">{{ session('estado') }}</div>
-        @endif
-        @yield('contenido')
-    </div>
+<main @class(['principal', 'estrecho' => View::hasSection('estrecho')])>
+    @if (session('estado'))
+        <div class="aviso-ok">@include('partials.icono', ['nombre' => 'ok']) {{ session('estado') }}</div>
+    @endif
+    @yield('contenido')
 </main>
+<script>
+    // Botones "Copiar": copian data-copiar al portapapeles y confirman durante un momento.
+    document.querySelectorAll('[data-copiar]').forEach(function (boton) {
+        boton.addEventListener('click', function () {
+            navigator.clipboard.writeText(boton.dataset.copiar).then(function () {
+                var texto = boton.textContent;
+                boton.textContent = 'Copiado';
+                setTimeout(function () { boton.textContent = texto; }, 1600);
+            });
+        });
+    });
+</script>
+@stack('scripts')
 </body>
 </html>
