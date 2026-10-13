@@ -68,6 +68,7 @@
             <button class="boton" type="button" onclick="this.closest('dialog').close()">Cancelar</button>
             <form method="POST" action="{{ route('admin.videos.destroy', $video) }}">
                 @csrf @method('DELETE')
+                <input type="hidden" name="desde_detalle" value="1">
                 <button class="boton primario" type="submit">Eliminar</button>
             </form>
         </div>

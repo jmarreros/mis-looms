@@ -31,7 +31,8 @@
 </head>
 <body>
 <main class="publica">
-    <span class="marca"><img src="{{ asset('logo.svg') }}" alt="">{{ config('app.name') }}</span>
+    {{-- Lleva a la raíz: con sesión de administrador abre el listado de videos; sin ella, el login. --}}
+    <a class="marca" href="{{ url('/') }}" title="Ir al inicio"><img src="{{ asset('logo.svg') }}" alt="">{{ config('app.name') }}</a>
     <video class="reproductor" controls autoplay playsinline preload="metadata"
            @if ($video->urlMiniatura()) poster="{{ $video->urlMiniatura() }}" @endif
            src="{{ $video->urlVideo() }}"></video>

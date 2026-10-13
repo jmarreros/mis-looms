@@ -35,9 +35,9 @@
     document.querySelectorAll('[data-copiar]').forEach(function (boton) {
         boton.addEventListener('click', function () {
             navigator.clipboard.writeText(boton.dataset.copiar).then(function () {
-                var texto = boton.textContent;
+                var original = boton.innerHTML;
                 boton.textContent = 'Copiado';
-                setTimeout(function () { boton.textContent = texto; }, 1600);
+                setTimeout(function () { boton.innerHTML = original; }, 1600);
             });
         });
     });

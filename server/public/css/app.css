@@ -21,6 +21,7 @@
     --fuente-titulo: "Caprasimo", system-ui, sans-serif;
     --fuente: "Figtree", system-ui, -apple-system, sans-serif;
     --radio: 28px;
+    --aro-foco: 0 0 0 3px color-mix(in srgb, var(--acento-500) 28%, transparent);
     --margen: clamp(20px, 4vw, 48px);
 }
 
@@ -63,7 +64,7 @@ input::placeholder { color: var(--neutro-600); }
     height: 50px; padding: 0 22px; border-radius: 999px; border: 1.5px solid var(--borde);
     background: var(--neutro-900); color: var(--neutro-100); font: inherit; font-size: 16px; font-weight: 400; width: 100%;
 }
-.entrada:focus { border-color: var(--acento-500); }
+.entrada:focus { border-color: var(--acento-500); box-shadow: var(--aro-foco); outline: none; }
 .error { color: var(--peligro); font-size: 14px; font-weight: 500; }
 .casilla { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--neutro-400); cursor: pointer; }
 .casilla input { accent-color: var(--acento-500); width: 16px; height: 16px; margin: 0; }
@@ -138,14 +139,19 @@ input::placeholder { color: var(--neutro-600); }
     display: flex; align-items: center; gap: 12px; max-width: 620px; height: 52px; padding: 0 8px 0 20px;
     border-radius: 999px; background: var(--neutro-900); border: 1.5px solid var(--borde);
 }
-.buscador:focus-within { border-color: var(--acento-500); }
+.buscador:focus-within { border-color: var(--acento-500); box-shadow: var(--aro-foco); }
+/* El foco lo muestra el contenedor redondeado; sin esto el input dibuja además su propio recuadro. */
+.buscador input:focus-visible { outline: none; }
 .buscador input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; color: var(--neutro-100); font: inherit; font-size: 16px; }
 .buscador input::-webkit-search-cancel-button { display: none; }
 
 /* Rejilla de videos */
 .rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 28px 24px; }
-.tarjeta-video { display: flex; flex-direction: column; gap: 14px; color: inherit; transition: transform .15s; }
-.tarjeta-video:hover { color: inherit; transform: translateY(-2px); }
+.tarjeta-video { display: flex; flex-direction: column; gap: 14px; }
+.enlace-video { display: flex; flex-direction: column; gap: 14px; color: inherit; transition: transform .15s; }
+.enlace-video:hover { color: inherit; transform: translateY(-2px); }
+.acciones-tarjeta { display: flex; gap: 8px; padding: 0 6px; }
+.boton.icono { width: 36px; padding: 0; }
 .tarjeta-video .info { display: flex; flex-direction: column; gap: 6px; padding: 0 6px; }
 .tarjeta-video .titulo { font-size: 16px; font-weight: 600; line-height: 1.3; text-wrap: pretty; word-break: break-word; }
 .tarjeta-video .meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--neutro-400); }

@@ -22,6 +22,14 @@ class VideoAdminController extends Controller
             ->paginate(12)
             ->withQueryString();
 
+        // Tras borrar el último video de una página, esa página queda vacía: ir a la última que exista.
+        if ($videos->isEmpty() && $videos->currentPage() > 1) {
+            return redirect()->route('admin.videos.index', array_filter([
+                'q' => $busqueda,
+                'page' => $videos->lastPage() > 1 ? $videos->lastPage() : null,
+            ]));
+        }
+
         return view('admin.videos', ['videos' => $videos, 'busqueda' => $busqueda, 'total' => Video::count()]);
     }
 
@@ -38,11 +46,14 @@ class VideoAdminController extends Controller
         return back()->with('estado', 'Título actualizado.');
     }
 
-    public function destroy(Video $video, VideoStorage $almacen): RedirectResponse
+    public function destroy(Request $request, Video $video, VideoStorage $almacen): RedirectResponse
     {
         $video->eliminarCompleto($almacen);
 
-        // Se elimina desde su página de detalle, que ya no existe: volver al listado.
-        return redirect()->route('admin.videos.index')->with('estado', 'Video eliminado.');
+        // Desde el detalle, esa página ya no existe: ir al listado. Desde el listado, volver a la
+        // misma página y búsqueda.
+        $destino = $request->boolean('desde_detalle') ? redirect()->route('admin.videos.index') : back();
+
+        return $destino->with('estado', 'Video eliminado.');
     }
 }

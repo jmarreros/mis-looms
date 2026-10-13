@@ -98,6 +98,45 @@ class PanelTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_la_pagina_publica_sin_sesion_no_ofrece_acciones_de_administrador(): void
+    {
+        $v = $this->video(['title' => 'Mi demo']);
+
+        $this->get("/v/{$v->slug}")
+            ->assertOk()
+            ->assertSee('Mi demo')
+            ->assertDontSee('data-copiar', false)
+            ->assertDontSee('confirmar-eliminar', false)
+            ->assertDontSee('name="title"', false);
+    }
+
+    public function test_el_administrador_ve_en_la_pagina_publica_el_detalle_con_acciones(): void
+    {
+        $v = $this->video(['title' => 'Mi demo']);
+
+        $this->actingAs(User::factory()->create())
+            ->get("/v/{$v->slug}")
+            ->assertOk()
+            ->assertSee('Mi demo')
+            ->assertSee('data-copiar="'.$v->urlCompartir().'"', false)
+            ->assertSee('action="'.route('admin.videos.update', $v).'"', false)
+            ->assertSee('confirmar-eliminar', false)
+            ->assertSee('Token de la app');
+
+        $this->assertSame(0, $v->fresh()->views);  // sus visitas no cuentan
+    }
+
+    public function test_logo_de_la_pagina_publica_lleva_al_inicio(): void
+    {
+        $v = $this->video();
+
+        $this->get("/v/{$v->slug}")->assertSee('href="'.url('/').'"', false);
+
+        // Sin sesión, el inicio termina en el login; con sesión de administrador, en el listado.
+        $this->followingRedirects()->get('/')->assertOk()->assertSee('Entrar');
+        $this->actingAs(User::factory()->create())->followingRedirects()->get('/')->assertOk()->assertSee('Token de la app');
+    }
+
     // --- Administración ---
 
     public function test_listado_con_busqueda(): void
@@ -148,10 +187,58 @@ class PanelTest extends TestCase
     {
         $v = $this->video(['thumbnail_key' => 'thumbs/abc.jpg']);
 
-        $this->actingAs(User::factory()->create())->delete("/admin/videos/{$v->slug}")->assertRedirect('/admin');
+        $this->actingAs(User::factory()->create())->delete("/admin/videos/{$v->slug}")->assertRedirect();
 
         $this->assertDatabaseMissing('videos', ['id' => $v->id]);
         $this->assertSame([$v->s3_key, 'thumbs/abc.jpg'], $this->almacen->borrados);
+    }
+
+    public function test_cada_video_del_listado_tiene_copiar_renombrar_y_eliminar(): void
+    {
+        $listo = $this->video(['title' => 'Terminado']);
+        $subiendo = $this->video(['title' => 'En curso', 'status' => Video::SUBIENDO, 'upload_id' => 'u1']);
+
+        $r = $this->actingAs(User::factory()->create())->get('/admin')->assertOk();
+
+        $r->assertSee('data-copiar="'.$listo->urlCompartir().'"', false)
+            ->assertDontSee('data-copiar="'.$subiendo->urlCompartir().'"', false)
+            ->assertSee('data-url="'.route('admin.videos.update', $listo).'"', false)
+            ->assertSee('data-url="'.route('admin.videos.destroy', $subiendo).'"', false);
+        $this->assertSame(2, substr_count($r->getContent(), 'data-renombrar data-url='));
+        $this->assertSame(2, substr_count($r->getContent(), 'data-eliminar data-url='));
+    }
+
+    public function test_eliminar_desde_el_listado_vuelve_a_la_misma_pagina_y_busqueda(): void
+    {
+        $v = $this->video(['title' => 'Demo']);
+
+        $this->actingAs(User::factory()->create())
+            ->from('/admin?q=Demo&page=2')
+            ->delete("/admin/videos/{$v->slug}")
+            ->assertRedirect('/admin?q=Demo&page=2')
+            ->assertSessionHas('estado', 'Video eliminado.');
+    }
+
+    public function test_eliminar_desde_el_detalle_vuelve_al_listado(): void
+    {
+        $v = $this->video();
+
+        $this->actingAs(User::factory()->create())
+            ->from("/admin/videos/{$v->slug}")
+            ->delete("/admin/videos/{$v->slug}", ['desde_detalle' => 1])
+            ->assertRedirect('/admin');
+    }
+
+    public function test_una_pagina_que_se_queda_vacia_redirige_a_la_ultima(): void
+    {
+        foreach (range(1, 13) as $i) {
+            $this->video(['title' => "Video $i"]);
+        }
+        $usuario = User::factory()->create();
+
+        $this->actingAs($usuario)->get('/admin?page=2')->assertOk();                       // el 13.º está en la 2
+        Video::latest('id')->skip(12)->first()->delete();                                  // desaparece el único de la 2
+        $this->actingAs($usuario)->get('/admin?page=2')->assertRedirect('/admin');         // vuelve a la única que queda
     }
 
     public function test_eliminar_una_subida_en_curso_la_aborta(): void

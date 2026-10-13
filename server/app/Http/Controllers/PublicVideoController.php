@@ -11,10 +11,13 @@ class PublicVideoController extends Controller
     {
         $video = Video::listos()->where('slug', $slug)->firstOrFail();
 
-        // Las visitas del propio administrador (sesión abierta) no cuentan.
-        if (! Auth::check()) {
-            $video->increment('views');
+        // El administrador con sesión abierta ve la misma pantalla que el detalle del panel (copiar el
+        // enlace, renombrar, eliminar) y sus visitas no cuentan. Quien no tiene sesión ve la página pública.
+        if (Auth::check()) {
+            return view('admin.video', ['video' => $video]);
         }
+
+        $video->increment('views');
 
         return view('publico.video', ['video' => $video]);
     }
