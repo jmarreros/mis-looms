@@ -30,7 +30,7 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
   y texto Figtree de Google Fonts, botones y campos en píldora). Todo en
   `server/public/css/app.css`.
 
-## Estado (2026-10-11)
+## Estado (2026-10-13)
 
 **Fase 1 — HECHA y probada.** `linux/` en Rust (todavía sin GTK):
 - Daemon `mis-looms` con icono en la bandeja (ksni) y servicio D-Bus
@@ -59,16 +59,23 @@ PHPUnit con almacenamiento falso; flujo real probado contra S3 (1 y 2 partes, ab
 Despliegue y desarrollo: `docs/despliegue.md`. Pendiente: rellenar claves del usuario IAM
 `mis-looms-laravel` en `server/.env` y desplegar en cPanel.
 
-**Siguiente: Fase 3** — subida desde las apps (macOS primero, ya existe): cliente
-multipart con progreso y reintentos, miniatura, enlace al portapapeles, URL + token en
-Keychain.
+**Fase 3, macOS — HECHA (2026-10-13).** La app sube sola al terminar la grabación: ventana de
+Ajustes (URL + token en Llavero, "Probar conexión"), multipart a S3 con progreso, 3 partes en
+paralelo y reintentos, miniatura del segundo 1, enlace al portapapeles + notificación clicable,
+cancelar/reintentar y reanudación al abrir la app (estado en `~/Library/Application Support/
+Mis Looms/subidas/`). Añadido `GET /api/ping` al servidor. Probado de punta a punta contra S3
+real con un MP4 de 58 MB (6 partes, idéntico byte a byte), con `kill -9` + reanudar, Ctrl+C
+(aborta), subida cerrada por el servidor (empieza de cero) y token inválido. Ver `macos/README.md`.
+Sin probar: los reintentos por corte de red o URL caducada (403), y la interfaz (menú, ventana
+de Ajustes, clic en la notificación) no se verificó automáticamente.
+Pendiente: desplegar el servidor en cPanel; rotar las claves del usuario IAM (se mostraron en
+una conversación); pausa y cuenta regresiva; mezclar audio del sistema.
 
-**Después:**
-- Fase 3 (también Linux): subida desde la app de Linux (multipart con progreso y reintentos,
-  miniatura, enlace al portapapeles, notificación, ventana de configuración GTK4
-  con URL + token en el keyring).
-- Fase 4: panel de administración en Blade.
-- Segunda parte: app de macOS con el mismo contrato de API.
+**Siguiente: subida en Linux** (mismo flujo en Rust: multipart con progreso y reintentos,
+miniatura, enlace al portapapeles, notificación, ventana GTK4 con URL + token en el keyring).
+
+**Después:** pausa y cuenta regresiva en la grabación, mezclar el audio del sistema con el
+micrófono, y desplegar en cPanel (`docs/despliegue.md`).
 
 Al terminar una fase o tomar una decisión nueva, actualizar esta sección.
 

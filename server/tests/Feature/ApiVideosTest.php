@@ -33,6 +33,14 @@ class ApiVideosTest extends TestCase
         $this->postJson('/api/videos', ['size' => 100])->assertUnauthorized();
     }
 
+    public function test_ping_distingue_token_valido_de_invalido(): void
+    {
+        $this->getJson('/api/ping')->assertUnauthorized();
+
+        $this->autenticar();
+        $this->getJson('/api/ping')->assertOk()->assertJson(['ok' => true]);
+    }
+
     public function test_crear_devuelve_url_por_cada_parte(): void
     {
         $this->autenticar();

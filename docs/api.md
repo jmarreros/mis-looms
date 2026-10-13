@@ -15,6 +15,9 @@ Base: `https://TU-DOMINIO/api`. Todas las rutas exigen `Authorization: Bearer <t
 
 ## Endpoints
 
+### `GET /api/ping`
+`200 {"ok": true}` si el token es válido, `401` si no. Para el botón "Probar conexión" de las apps.
+
 ### `POST /api/videos`
 ```json
 { "size": 3115865, "title": "opcional", "duration": 12.7, "width": 1670, "height": 1080 }
