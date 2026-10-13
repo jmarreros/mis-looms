@@ -21,8 +21,8 @@ cada compilación.
 ## Uso
 
 - Icono en la barra de menú: iniciar/finalizar, abrir carpeta, audio del sistema.
-- Atajos globales: **⌥⇧L** inicia la grabación y **⌘⇧L** la finaliza (cada uno solo actúa
-  en su estado). Se definen en `AppDelegate.applicationDidFinishLaunching`.
+- Atajo global: **⌥⇧L** inicia la grabación y, pulsado de nuevo, la finaliza (el mismo atajo
+  alterna). Se define en `AppDelegate.applicationDidFinishLaunching`.
 - Permisos que pide la primera vez: Grabación de pantalla y Micrófono.
   Tras conceder Grabación de pantalla, macOS pide reabrir la app.
 - Audio del sistema: **desactivado por defecto** (opción del menú). Si se activa, se
@@ -33,10 +33,14 @@ cada compilación.
 
 1. En el menú: **Ajustes…** → pega la URL del servidor y el token (panel web › Token de la
    app) y pulsa "Probar conexión". El token se guarda en el Llavero de macOS.
-2. Al finalizar una grabación, la app sube sola el MP4 directo a S3 (partes de 10 MB, 3 en
-   paralelo, 4 reintentos por parte), sube una miniatura del segundo 1 y cierra la subida.
-3. Copia el enlace `…/v/{slug}` al portapapeles y notifica; pulsar la notificación abre el video.
-   El menú muestra el progreso (también junto al icono), **Cancelar subida** y **Copiar último enlace**.
+2. Al finalizar una grabación, la barra muestra «Finalizando…» (se cierra el MP4) y luego
+   «Subiendo N%», con una notificación «Subiendo al servidor». La app sube el MP4 directo a S3
+   (partes de 10 MB, 3 en paralelo, 4 reintentos por parte), sube una miniatura del segundo 1
+   y cierra la subida.
+3. Al terminar copia el enlace `…/v/{slug}` al portapapeles, notifica y **abre el video en el
+   navegador**. Se desactiva en el menú (**Abrir el enlace al terminar**); solo abre el
+   navegador con las grabaciones de la sesión actual, no con subidas retomadas al abrir la app.
+   El menú muestra el progreso, **Cancelar subida** y **Copiar último enlace**.
 
 Si la subida falla o la app se cierra a mitad, el estado queda en
 `~/Library/Application Support/Mis Looms/subidas/` y se **reanuda al abrir la app** (solo

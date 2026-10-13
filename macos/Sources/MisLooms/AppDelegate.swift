@@ -7,8 +7,7 @@ import UserNotifications
 final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private let recorder = Recorder()
     private var item: NSStatusItem!
-    private var atajoIniciar: AtajoGlobal?  // ⌥⇧L
-    private var atajoFinalizar: AtajoGlobal?  // ⌘⇧L
+    private var atajo: AtajoGlobal?  // ⌥⇧L: inicia o finaliza la grabación según el estado
     private var temporizador: Timer?
     private var inicio: Date?
     private var ocupado = false  // evita dobles clics mientras arranca o cierra
@@ -18,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var progresoSubida: Int?  // 0–100 mientras se sube
     private var fallidas: Set<String> = []  // fallaron en esta sesión: no se reintentan solas
     private var ultimoEnlace: String?
+    private var finalizando = false  // entre pulsar "finalizar" y tener el MP4 cerrado
+    private var abrirTrasSubir: Set<String> = []  // grabaciones de esta sesión: al subirse abren el navegador
 
     /// Logo monocromo (marca/logo-mono.svg, copiado por compilar.sh) como imagen plantilla:
     /// macOS lo tiñe según el tema. Fuera del .app (swift run) se usa un símbolo del sistema.
@@ -33,6 +34,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }()
 
     private static let claveAudioSistema = "grabarAudioDelSistema"  // false por defecto
+    private static let claveAbrirEnlace = "abrirEnlaceAlTerminar"  // true por defecto
+
+    private var abrirEnlace: Bool {
+        get { UserDefaults.standard.object(forKey: Self.claveAbrirEnlace) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: Self.claveAbrirEnlace) }
+    }
 
     private var audioDelSistema: Bool {
         get { UserDefaults.standard.bool(forKey: Self.claveAudioSistema) }
@@ -48,13 +55,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     func applicationDidFinishLaunching(_ notificacion: Notification) {
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        atajoIniciar = AtajoGlobal(tecla: kVK_ANSI_L, modificadores: optionKey | shiftKey) { [weak self] in
-            guard let self, !self.recorder.grabando, !self.ocupado else { return }
-            self.iniciar()
-        }
-        atajoFinalizar = AtajoGlobal(tecla: kVK_ANSI_L, modificadores: cmdKey | shiftKey) { [weak self] in
-            guard let self, self.recorder.grabando, !self.ocupado else { return }
-            self.detener()
+        atajo = AtajoGlobal(tecla: kVK_ANSI_L, modificadores: optionKey | shiftKey) { [weak self] in
+            self?.alternarGrabacion()
         }
         recorder.alDetenerseConError = { [weak self] error in
             Task { @MainActor in self?.capturaInterrumpida(error) }
@@ -77,6 +79,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     // MARK: - Acciones
+
+    /// Atajo y menú: inicia la grabación si no hay una en curso y la finaliza si la hay.
+    private func alternarGrabacion() {
+        guard !ocupado, !finalizando else { return }
+        if recorder.grabando { detener() } else { iniciar() }
+    }
 
     private func iniciar() {
         ocupado = true
@@ -121,9 +129,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         temporizador?.invalidate()
         temporizador = nil
         inicio = nil
+        finalizando = true
+        actualizarInterfaz()
+        defer {
+            finalizando = false
+            actualizarInterfaz()
+        }
         do {
             let url = try await recorder.detener()
-            notificar("Grabación guardada", url.lastPathComponent)
             encolarSubida(url)
         } catch {
             notificar("Error al guardar la grabación", error.localizedDescription)
@@ -142,14 +155,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func actualizarInterfaz() {
         guard let boton = item.button else { return }
-        if recorder.grabando {
+        if finalizando {
+            boton.image = Self.iconoReposo
+            boton.title = " Finalizando…"
+        } else if recorder.grabando {
             let transcurrido = Int(Date().timeIntervalSince(inicio ?? Date()))
             boton.image = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: "Grabando")?
                 .withSymbolConfiguration(.init(paletteColors: [.systemRed]))
             boton.title = String(format: " %d:%02d", transcurrido / 60, transcurrido % 60)
         } else {
             boton.image = Self.iconoReposo
-            boton.title = progresoSubida.map { " \($0)%" } ?? ""
+            boton.title = progresoSubida.map { " Subiendo \($0)%" } ?? ""
         }
         item.menu = construirMenu()
     }
@@ -157,21 +173,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func construirMenu() -> NSMenu {
         let menu = NSMenu()
 
-        let iniciar = NSMenuItem(title: "Iniciar grabación", action: #selector(iniciarDesdeMenu), keyEquivalent: "l")
-        iniciar.keyEquivalentModifierMask = [.option, .shift]
-        iniciar.target = self
-        iniciar.isEnabled = !recorder.grabando && !ocupado
-        menu.addItem(iniciar)
-
-        let finalizar = NSMenuItem(title: "Finalizar grabación", action: #selector(finalizarDesdeMenu), keyEquivalent: "l")
-        finalizar.keyEquivalentModifierMask = [.command, .shift]
-        finalizar.target = self
-        finalizar.isEnabled = recorder.grabando && !ocupado
-        menu.addItem(finalizar)
+        let alternar = NSMenuItem(title: finalizando ? "Finalizando grabación…" : recorder.grabando ? "Finalizar grabación" : "Iniciar grabación",
+                                  action: #selector(alternarDesdeMenu), keyEquivalent: "l")
+        alternar.keyEquivalentModifierMask = [.option, .shift]
+        alternar.target = self
+        alternar.isEnabled = !ocupado && !finalizando
+        menu.addItem(alternar)
 
         if let progreso = progresoSubida {
             menu.addItem(.separator())
-            let estado = NSMenuItem(title: "Subiendo… \(progreso) %", action: nil, keyEquivalent: "")
+            let estado = NSMenuItem(title: "Subiendo al servidor… \(progreso) %", action: nil, keyEquivalent: "")
             estado.isEnabled = false
             menu.addItem(estado)
             let cancelar = NSMenuItem(title: "Cancelar subida", action: #selector(cancelarSubida), keyEquivalent: "")
@@ -191,6 +202,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         sistema.state = audioDelSistema ? .on : .off
         sistema.isEnabled = !recorder.grabando
         menu.addItem(sistema)
+
+        let abrirNavegador = NSMenuItem(title: "Abrir el enlace al terminar", action: #selector(cambiarAbrirEnlace), keyEquivalent: "")
+        abrirNavegador.target = self
+        abrirNavegador.state = abrirEnlace ? .on : .off
+        menu.addItem(abrirNavegador)
 
         let abrir = NSMenuItem(title: "Abrir carpeta de grabaciones", action: #selector(abrirCarpeta), keyEquivalent: "")
         abrir.target = self
@@ -212,11 +228,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         return menu
     }
 
-    @objc private func iniciarDesdeMenu() { iniciar() }
-    @objc private func finalizarDesdeMenu() { detener() }
+    @objc private func alternarDesdeMenu() { alternarGrabacion() }
 
     @objc private func cambiarAudioSistema() {
         audioDelSistema.toggle()
+        actualizarInterfaz()
+    }
+
+    @objc private func cambiarAbrirEnlace() {
+        abrirEnlace.toggle()
         actualizarInterfaz()
     }
 
@@ -243,13 +263,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     /// Guarda la grabación como subida pendiente y la procesa (o avisa de que falta configurar).
     private func encolarSubida(_ archivo: URL) {
         do {
-            _ = try EstadoSubida.nueva(archivo: archivo)
+            abrirTrasSubir.insert(try EstadoSubida.nueva(archivo: archivo).id)
         } catch {
             notificar("No se pudo preparar la subida", error.localizedDescription)
             return
         }
         guard Configuracion.completa else {
-            notificar("Falta configurar el servidor", "Abre Ajustes en el menú: la grabación se subirá al guardar la URL y el token.")
+            notificar("Grabación guardada", "Falta configurar el servidor: abre Ajustes en el menú y se subirá al guardar la URL y el token.")
             return
         }
         procesarPendientes()
@@ -273,6 +293,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func subir(_ estado: EstadoSubida) async -> Bool {
         progresoSubida = 0
         actualizarInterfaz()
+        let nombre = (estado.archivo as NSString).lastPathComponent
+        let tamano = ByteCountFormatter.string(fromByteCount: Int64(estado.tamano), countStyle: .file)
+        notificar(estado.slug == nil ? "Subiendo al servidor" : "Retomando la subida", "\(nombre) · \(tamano)")
         do {
             let subidor = Subidor(api: try ClienteAPI())
             let enlace = try await subidor.procesar(estado) { [weak self] fraccion in
@@ -281,6 +304,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
             ultimoEnlace = enlace
             copiar(enlace)
             notificar("Enlace copiado", enlace, url: enlace)
+            // Solo las grabaciones de esta sesión abren el navegador; una subida retomada al
+            // arrancar la app no debe abrir ventanas por sorpresa.
+            if abrirTrasSubir.remove(estado.id) != nil, abrirEnlace, let url = URL(string: enlace) {
+                NSWorkspace.shared.open(url)
+            }
             return true
         } catch is CancellationError {
             notificar("Subida cancelada", "El video sigue en la carpeta de grabaciones.")
