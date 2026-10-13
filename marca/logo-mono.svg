@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="62 60 388 388" width="512" height="512">
+  <title>Mis Looms (monocromo)</title>
+  <!-- Versión de un solo color para la barra de menú y la bandeja: los detalles son huecos
+       transparentes (máscaras), así funciona como imagen plantilla en macOS. -->
+  <defs>
+    <mask id="pantalla">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M182 252 L182 340 L256 296 Z" fill="#000" stroke="#000" stroke-width="22" stroke-linejoin="round"/>
+      <circle cx="358" cy="188" r="84" fill="#000"/>
+    </mask>
+    <mask id="insignia">
+      <rect width="512" height="512" fill="#fff"/>
+      <path d="M332 214 L384 162 M346 160 H386 V200" fill="none" stroke="#000"
+            stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+    </mask>
+  </defs>
+  <rect x="70" y="188" width="288" height="216" rx="40" fill="#000" mask="url(#pantalla)"/>
+  <circle cx="358" cy="188" r="64" fill="#000" mask="url(#insignia)"/>
+</svg>

@@ -21,6 +21,11 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
 - El repositorio es PÚBLICO (github.com/jmarreros/mis-looms): no subir secretos
   (`server/.env`, claves de AWS, tokens). Rama principal: `master`.
 - Todo el texto (código, comentarios, documentación, mensajes) va en español.
+- Logo en `marca/`: `logo.svg` (degradado azul `#6A9BD8` → `#33639E`) y `logo-mono.svg`
+  (huecos transparentes, para barra de menú/bandeja). macOS los toma al compilar
+  (`.icns` + icono plantilla de la barra); el servidor usa una copia en
+  `server/public/logo.svg` (favicon, cabecera, login): si cambia el logo, copiarlo de nuevo.
+  Color de acento del panel a juego: `#33639e` (claro) / `#6a9bd8` (oscuro).
 
 ## Estado (2026-10-11)
 

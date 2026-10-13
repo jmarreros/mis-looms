@@ -27,6 +27,7 @@
     @endif
     <meta name="twitter:title" content="{{ $video->titulo() }}">
 
+    <link rel="icon" type="image/svg+xml" href="{{ asset('logo.svg') }}">
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 </head>
 <body class="pagina-publica">

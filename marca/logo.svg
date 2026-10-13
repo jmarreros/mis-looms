@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Mis Looms</title>
+  <defs>
+    <!-- Degradado en coordenadas absolutas para que el recorte de la insignia se funda con el fondo -->
+    <linearGradient id="fondo" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="512">
+      <stop offset="0" stop-color="#6A9BD8"/>
+      <stop offset="1" stop-color="#33639E"/>
+    </linearGradient>
+  </defs>
+  <!-- Fondo del icono -->
+  <rect width="512" height="512" rx="114" fill="url(#fondo)"/>
+  <g transform="translate(-14 40)">
+    <!-- Pantalla con el video -->
+    <rect x="84" y="148" width="288" height="216" rx="40" fill="#fff"/>
+    <path d="M196 212 L196 300 L270 256 Z" fill="url(#fondo)" stroke="url(#fondo)"
+          stroke-width="22" stroke-linejoin="round"/>
+    <!-- Insignia de compartir: el enlace que sale del video -->
+    <circle cx="372" cy="148" r="84" fill="url(#fondo)"/>
+    <circle cx="372" cy="148" r="64" fill="#fff"/>
+    <path d="M346 174 L398 122 M360 120 H400 V160" fill="none" stroke="url(#fondo)"
+          stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

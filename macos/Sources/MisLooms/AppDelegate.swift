@@ -13,6 +13,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var inicio: Date?
     private var ocupado = false  // evita dobles clics mientras arranca o cierra
 
+    /// Logo monocromo (marca/logo-mono.svg, copiado por compilar.sh) como imagen plantilla:
+    /// macOS lo tiñe según el tema. Fuera del .app (swift run) se usa un símbolo del sistema.
+    private static let iconoReposo: NSImage? = {
+        guard let url = Bundle.main.url(forResource: "barra-menu", withExtension: "svg"),
+              let imagen = NSImage(contentsOf: url) else {
+            return NSImage(systemSymbolName: "record.circle", accessibilityDescription: "Mis Looms")
+        }
+        imagen.size = NSSize(width: 18, height: 18)
+        imagen.isTemplate = true
+        imagen.accessibilityDescription = "Mis Looms"
+        return imagen
+    }()
+
     private static let claveAudioSistema = "grabarAudioDelSistema"  // false por defecto
 
     private var audioDelSistema: Bool {
@@ -124,7 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .withSymbolConfiguration(.init(paletteColors: [.systemRed]))
             boton.title = String(format: " %d:%02d", transcurrido / 60, transcurrido % 60)
         } else {
-            boton.image = NSImage(systemSymbolName: "record.circle", accessibilityDescription: "Mis Looms")
+            boton.image = Self.iconoReposo
             boton.title = ""
         }
         item.menu = construirMenu()

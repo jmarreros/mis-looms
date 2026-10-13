@@ -8,6 +8,8 @@
     <string>Mis Looms</string>
     <key>CFBundleDisplayName</key>
     <string>Mis Looms</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleExecutable</key>
     <string>MisLooms</string>
     <key>CFBundlePackageType</key>
