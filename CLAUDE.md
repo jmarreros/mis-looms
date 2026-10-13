@@ -25,6 +25,9 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
   (huecos transparentes, para barra de menú/bandeja). macOS los toma al compilar
   (`.icns` + icono plantilla de la barra); el servidor usa una copia en
   `server/public/logo.svg` (favicon, cabecera, login): si cambia el logo, copiarlo de nuevo.
+- Página pública `/v/{slug}`: con sesión de administrador muestra el detalle del panel (copiar
+  enlace, renombrar, eliminar; sus visitas no cuentan); sin sesión, la página pública sin esas
+  opciones. Tras grabar, la app de macOS abre esta URL en el navegador.
 - Panel web: siempre en modo oscuro, según el diseño de Claude Design (sistema "Organic":
   fondo `#1c1a17`, acento terracota `#d67f48`, salvia de segundo color, títulos Caprasimo
   y texto Figtree de Google Fonts, botones y campos en píldora). Todo en
@@ -42,13 +45,12 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
 
 **App macOS (adelantada, 2026-10-12) — HECHA y probada.** `macos/`: paquete SwiftPM (sin
 Xcode, solo Command Line Tools), app de barra de menú, ScreenCaptureKit + AVAssetWriter.
-Atajos globales ⌥⇧L (iniciar) y ⌘⇧L (finalizar). MP4 H.264 + AAC estéreo, ≤1080p,
+Atajo global ⌥⇧L (inicia y, de nuevo, finaliza; ⌘⇧L chocaba con Loom). MP4 H.264 + AAC estéreo, ≤1080p,
 faststart, en `~/Movies/mis-looms/` (verificado con ffprobe). Audio del sistema
 desactivado por defecto (opción de menú; sin mezclar aún, ver TODO en `Recorder.swift`).
 Compilar: `macos/crear-certificado.sh` (una vez) + `macos/compilar.sh`; el certificado
 "Mis Looms Dev" mantiene los permisos entre compilaciones. Detalles: [macos/README.md](macos/README.md).
-Pendiente: mezclar audio del sistema en una sola pista; cuenta regresiva y pausa; la
-subida a S3 va después de la API (Fase 3, mismo contrato).
+Pendiente: mezclar audio del sistema en una sola pista; cuenta regresiva y pausa.
 
 **Fase 2 — HECHA (2026-10-12).** S3 configurado y verificado (`mis-looms-jmarreros`,
 us-east-1) y backend Laravel 13.35 en `server/` (Blade puro, CSS a mano sin Vite/Node):
@@ -56,8 +58,8 @@ API Sanctum multipart (`docs/api.md`), página pública `/v/{slug}` con Open Gra
 (login, listado con búsqueda, renombrar, eliminar con borrado en S3, token de la app),
 comandos `mislooms:crear-usuario` y `mislooms:limpiar-subidas` (cron horario). 23 pruebas
 PHPUnit con almacenamiento falso; flujo real probado contra S3 (1 y 2 partes, abort).
-Despliegue y desarrollo: `docs/despliegue.md`. Pendiente: rellenar claves del usuario IAM
-`mis-looms-laravel` en `server/.env` y desplegar en cPanel.
+Despliegue y desarrollo: `docs/despliegue.md`. Claves del usuario IAM `mis-looms-laravel`
+rotadas y verificadas contra S3 el 2026-10-13. Pendiente: desplegar en cPanel.
 
 **Fase 3, macOS — HECHA (2026-10-13).** La app sube sola al terminar la grabación: ventana de
 Ajustes (URL + token en Llavero, "Probar conexión"), multipart a S3 con progreso, 3 partes en
@@ -68,14 +70,25 @@ real con un MP4 de 58 MB (6 partes, idéntico byte a byte), con `kill -9` + rean
 (aborta), subida cerrada por el servidor (empieza de cero) y token inválido. Ver `macos/README.md`.
 Sin probar: los reintentos por corte de red o URL caducada (403), y la interfaz (menú, ventana
 de Ajustes, clic en la notificación) no se verificó automáticamente.
-Pendiente: desplegar el servidor en cPanel; rotar las claves del usuario IAM (se mostraron en
-una conversación); pausa y cuenta regresiva; mezclar audio del sistema.
 
-**Siguiente: subida en Linux** (mismo flujo en Rust: multipart con progreso y reintentos,
-miniatura, enlace al portapapeles, notificación, ventana GTK4 con URL + token en el keyring).
+**Pulido de macOS + panel (2026-10-13), hecho:**
+- App de macOS: ventana de Ajustes rediseñada (campos en píldora de una línea, botones grandes,
+  aviso verde/rojo); un solo atajo ⌥⇧L que alterna; al finalizar muestra «Finalizando…» →
+  «Subiendo N%» (+ notificación) y abre el enlace en el navegador (opción de menú, solo con
+  grabaciones de la sesión). Instalada en `/Applications/Mis Looms.app` (copiar con `ditto`
+  tras `compilar.sh`).
+- Panel Laravel rehecho con el diseño de Claude Design (oscuro, naranja terracota, Caprasimo +
+  Figtree): login, listado con buscador y, en cada tarjeta, copiar enlace / renombrar / eliminar
+  (vuelve a la misma página; no deja páginas vacías), detalle del video, token. 33 pruebas.
+- Logo naranja en `marca/` (app, favicon, panel).
 
-**Después:** pausa y cuenta regresiva en la grabación, mezclar el audio del sistema con el
-micrófono, y desplegar en cPanel (`docs/despliegue.md`).
+**Decisión (2026-10-13): la app de Linux queda en pausa**; el foco es la app de macOS y el
+backend Laravel.
+
+**Siguiente:** desplegar en cPanel (`docs/despliegue.md`: dominio con HTTPS, PHP ≥ 8.2, SSH,
+claves nuevas en el `.env` del servidor) y hacer una grabación real de punta a punta. Después:
+abrir la app al iniciar sesión, pausa y cuenta regresiva, mezclar el audio del sistema con el
+micrófono, script `instalar.sh`, videos privados («solo yo») y cambio de contraseña desde el panel.
 
 Al terminar una fase o tomar una decisión nueva, actualizar esta sección.
 
