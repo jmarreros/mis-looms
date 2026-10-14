@@ -33,7 +33,16 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     private var sesionIniciada = false
     private var finalizando = false
 
+    // Pausa (solo se tocan en `cola`). Las muestras llegan con la hora del reloj del sistema:
+    // durante la pausa se descartan y, al reanudar, a todas se les resta el tiempo pausado
+    // acumulado para que el MP4 continúe sin huecos.
+    private var enPausa = false
+    private var inicioPausa = CMTime.invalid
+    private var reanudadoEn = CMTime.invalid
+    private var desfase = CMTime.zero
+
     private(set) var archivo: URL?
+    private(set) var pausado = false  // copia para el hilo principal
 
     var grabando: Bool { stream != nil }
 
@@ -46,7 +55,9 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         guard let pantalla = contenido.displays.first(where: { $0.displayID == principal })
                 ?? contenido.displays.first else { throw RecorderError.sinPantalla }
 
-        let filtro = SCContentFilter(display: pantalla, excludingWindows: [])
+        // Las ventanas de la propia app (controles flotantes, Ajustes) no salen en el video.
+        let propia = contenido.applications.filter { $0.processID == getpid() }
+        let filtro = SCContentFilter(display: pantalla, excludingApplications: propia, exceptingWindows: [])
         let (ancho, alto) = Self.dimensiones(pantalla: pantalla, filtro: filtro)
 
         let config = SCStreamConfiguration()
@@ -133,6 +144,35 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         entradaSistema = sistema
         sesionIniciada = false
         finalizando = false
+        enPausa = false
+        inicioPausa = .invalid
+        reanudadoEn = .invalid
+        desfase = .zero
+        pausado = false
+    }
+
+    // MARK: - Pausa
+
+    func pausar() {
+        guard grabando, !pausado else { return }
+        pausado = true
+        let ahora = CMClockGetTime(CMClockGetHostTimeClock())
+        cola.async {
+            self.enPausa = true
+            self.inicioPausa = ahora
+        }
+    }
+
+    func reanudar() {
+        guard grabando, pausado else { return }
+        pausado = false
+        let ahora = CMClockGetTime(CMClockGetHostTimeClock())
+        cola.async {
+            guard self.enPausa else { return }
+            self.enPausa = false
+            self.desfase = CMTimeAdd(self.desfase, CMTimeSubtract(ahora, self.inicioPausa))
+            self.reanudadoEn = ahora
+        }
     }
 
     // MARK: - Fin
@@ -144,6 +184,25 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
             self.stream = nil
         }
         return try await finalizar()
+    }
+
+    /// Detiene la captura sin guardar nada y borra el archivo a medias.
+    func descartar() async {
+        if let stream {
+            try? await stream.stopCapture()
+            self.stream = nil
+        }
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            cola.async {
+                self.finalizando = true
+                if self.escritor?.status == .writing { self.escritor?.cancelWriting() }
+                cont.resume()
+            }
+        }
+        escritor = nil; entradaVideo = nil; entradaMicrofono = nil; entradaSistema = nil
+        if let archivo { try? FileManager.default.removeItem(at: archivo) }
+        archivo = nil
+        pausado = false
     }
 
     private func finalizar() async throws -> URL {
@@ -178,7 +237,10 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
     // MARK: - SCStreamOutput
 
     func stream(_ stream: SCStream, didOutputSampleBuffer buffer: CMSampleBuffer, of tipo: SCStreamOutputType) {
-        guard buffer.isValid, !finalizando, let w = escritor, w.status == .writing else { return }
+        guard buffer.isValid, !finalizando, !enPausa, let w = escritor, w.status == .writing else { return }
+        // Muestras de antes de reanudar que llegan tarde: se descartan para no retroceder en el tiempo.
+        if reanudadoEn.isValid, CMTimeCompare(buffer.presentationTimeStamp, reanudadoEn) < 0 { return }
+        guard let buffer = desplazado(buffer) else { return }
 
         switch tipo {
         case .screen:
@@ -197,6 +259,19 @@ final class Recorder: NSObject, SCStreamOutput, SCStreamDelegate {
         @unknown default:
             break
         }
+    }
+
+    /// Copia de la muestra con los tiempos adelantados en el tiempo pausado acumulado.
+    private func desplazado(_ buffer: CMSampleBuffer) -> CMSampleBuffer? {
+        guard desfase != .zero else { return buffer }
+        guard var tiempos = try? buffer.sampleTimingInfos() else { return nil }
+        for i in tiempos.indices {
+            tiempos[i].presentationTimeStamp = CMTimeSubtract(tiempos[i].presentationTimeStamp, desfase)
+            if tiempos[i].decodeTimeStamp.isValid {
+                tiempos[i].decodeTimeStamp = CMTimeSubtract(tiempos[i].decodeTimeStamp, desfase)
+            }
+        }
+        return try? CMSampleBuffer(copying: buffer, withNewTiming: tiempos)
     }
 
     /// ScreenCaptureKit también entrega buffers "idle"/"blank" sin imagen: se descartan.

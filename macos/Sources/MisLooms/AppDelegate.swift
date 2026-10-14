@@ -9,10 +9,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private var item: NSStatusItem!
     private var atajo: AtajoGlobal?  // ⌥⇧L: inicia o finaliza la grabación según el estado
     private var temporizador: Timer?
-    private var inicio: Date?
+    private var inicio: Date?  // inicio del tramo actual; nil en pausa
+    private var acumulado: TimeInterval = 0  // segundos grabados en tramos anteriores a la última pausa
     private var ocupado = false  // evita dobles clics mientras arranca o cierra
 
     private let ajustes = VentanaAjustes()
+    private let panel = PanelFlotante()
     private var subida: Task<Void, Never>?  // subidas pendientes, una detrás de otra
     private var progresoSubida: Int?  // 0–100 mientras se sube
     private var fallidas: Set<String> = []  // fallaron en esta sesión: no se reintentan solas
@@ -35,6 +37,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private static let claveAudioSistema = "grabarAudioDelSistema"  // false por defecto
     private static let claveAbrirEnlace = "abrirEnlaceAlTerminar"  // true por defecto
+    private static let claveMostrarPanel = "mostrarPanelFlotante"  // true por defecto
+
+    private var mostrarPanel: Bool {
+        get { UserDefaults.standard.object(forKey: Self.claveMostrarPanel) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: Self.claveMostrarPanel) }
+    }
 
     private var abrirEnlace: Bool {
         get { UserDefaults.standard.object(forKey: Self.claveAbrirEnlace) as? Bool ?? true }
@@ -63,6 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         }
         NSApp.mainMenu = Self.menuPrincipal()
         ajustes.alGuardar = { [weak self] in self?.reintentarSubidas() }
+        panel.alGrabar = { [weak self] in self?.alternarGrabacion() }
+        panel.alFinalizar = { [weak self] in self?.alternarGrabacion() }
+        panel.alPausar = { [weak self] in self?.pausar() }
+        panel.alReanudar = { [weak self] in self?.reanudar() }
+        panel.alDescartar = { [weak self] in self?.descartar() }
+        panel.alSalir = { NSApp.terminate(nil) }
+        if mostrarPanel { panel.mostrar() }
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         actualizarInterfaz()
@@ -102,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 let destino = carpeta.appendingPathComponent("looms-\(formato.string(from: Date())).mp4")
                 try await recorder.iniciar(destino: destino, audioDelSistema: audioDelSistema)
                 inicio = Date()
+                acumulado = 0
                 temporizador = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
                     Task { @MainActor in self?.actualizarInterfaz() }
                 }
@@ -114,6 +130,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
             }
         }
+    }
+
+    private func pausar() {
+        guard recorder.grabando, !recorder.pausado, !ocupado, !finalizando else { return }
+        recorder.pausar()
+        acumulado += Date().timeIntervalSince(inicio ?? Date())
+        inicio = nil
+        actualizarInterfaz()
+    }
+
+    private func reanudar() {
+        guard recorder.grabando, recorder.pausado, !ocupado, !finalizando else { return }
+        recorder.reanudar()
+        inicio = Date()
+        actualizarInterfaz()
+    }
+
+    /// Tira la grabación en pausa (sin subirla) y deja la app lista para empezar otra.
+    private func descartar() {
+        guard recorder.grabando, recorder.pausado, !ocupado, !finalizando else { return }
+        ocupado = true
+        temporizador?.invalidate()
+        temporizador = nil
+        inicio = nil
+        acumulado = 0
+        actualizarInterfaz()
+        Task {
+            await recorder.descartar()
+            ocupado = false
+            actualizarInterfaz()
+        }
+    }
+
+    /// Segundos grabados sin contar las pausas.
+    private var segundosGrabados: Int {
+        Int(acumulado + (inicio.map { Date().timeIntervalSince($0) } ?? 0))
     }
 
     private func detener() {
@@ -129,6 +181,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         temporizador?.invalidate()
         temporizador = nil
         inicio = nil
+        acumulado = 0
         finalizando = true
         actualizarInterfaz()
         defer {
@@ -155,17 +208,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private func actualizarInterfaz() {
         guard let boton = item.button else { return }
+        let transcurrido = segundosGrabados
         if finalizando {
             boton.image = Self.iconoReposo
             boton.title = " Finalizando…"
+            panel.actualizar(.finalizando)
         } else if recorder.grabando {
-            let transcurrido = Int(Date().timeIntervalSince(inicio ?? Date()))
-            boton.image = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: "Grabando")?
-                .withSymbolConfiguration(.init(paletteColors: [.systemRed]))
+            let pausado = recorder.pausado
+            boton.image = NSImage(systemSymbolName: pausado ? "pause.circle.fill" : "record.circle.fill",
+                                  accessibilityDescription: pausado ? "En pausa" : "Grabando")?
+                .withSymbolConfiguration(.init(paletteColors: [pausado ? .systemYellow : .systemRed]))
             boton.title = String(format: " %d:%02d", transcurrido / 60, transcurrido % 60)
+            panel.actualizar(pausado ? .pausado(segundos: transcurrido) : .grabando(segundos: transcurrido))
         } else {
             boton.image = Self.iconoReposo
             boton.title = progresoSubida.map { " Subiendo \($0)%" } ?? ""
+            panel.actualizar(ocupado ? .iniciando : .reposo(subida: progresoSubida))
         }
         item.menu = construirMenu()
     }
@@ -179,6 +237,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         alternar.target = self
         alternar.isEnabled = !ocupado && !finalizando
         menu.addItem(alternar)
+
+        if recorder.grabando {
+            let pausa = NSMenuItem(title: recorder.pausado ? "Reanudar grabación" : "Pausar grabación",
+                                   action: #selector(alternarPausa), keyEquivalent: "")
+            pausa.target = self
+            pausa.isEnabled = !ocupado && !finalizando
+            menu.addItem(pausa)
+
+            let descartar = NSMenuItem(title: "Descartar grabación", action: #selector(descartarDesdeMenu), keyEquivalent: "")
+            descartar.target = self
+            descartar.isEnabled = recorder.pausado && !ocupado && !finalizando
+            menu.addItem(descartar)
+        }
 
         if let progreso = progresoSubida {
             menu.addItem(.separator())
@@ -208,6 +279,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         abrirNavegador.state = abrirEnlace ? .on : .off
         menu.addItem(abrirNavegador)
 
+        let flotante = NSMenuItem(title: "Mostrar controles flotantes", action: #selector(cambiarMostrarPanel), keyEquivalent: "")
+        flotante.target = self
+        flotante.state = mostrarPanel ? .on : .off
+        menu.addItem(flotante)
+
         let abrir = NSMenuItem(title: "Abrir carpeta de grabaciones", action: #selector(abrirCarpeta), keyEquivalent: "")
         abrir.target = self
         menu.addItem(abrir)
@@ -229,6 +305,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     @objc private func alternarDesdeMenu() { alternarGrabacion() }
+
+    /// Desde el menú pide confirmación: borra la grabación sin posibilidad de recuperarla.
+    @objc private func descartarDesdeMenu() {
+        let alerta = NSAlert()
+        alerta.messageText = "¿Descartar la grabación?"
+        alerta.informativeText = "Se borrará lo grabado hasta ahora y no se subirá."
+        alerta.addButton(withTitle: "Descartar")
+        alerta.addButton(withTitle: "Cancelar")
+        alerta.buttons.first?.hasDestructiveAction = true
+        NSApp.activate(ignoringOtherApps: true)
+        if alerta.runModal() == .alertFirstButtonReturn { descartar() }
+    }
+
+    @objc private func alternarPausa() {
+        if recorder.pausado { reanudar() } else { pausar() }
+    }
+
+    @objc private func cambiarMostrarPanel() {
+        mostrarPanel.toggle()
+        if mostrarPanel { panel.mostrar() } else { panel.ocultar() }
+        actualizarInterfaz()
+    }
 
     @objc private func cambiarAudioSistema() {
         audioDelSistema.toggle()

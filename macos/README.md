@@ -20,7 +20,20 @@ cada compilación.
 
 ## Uso
 
-- Icono en la barra de menú: iniciar/finalizar, abrir carpeta, audio del sistema.
+- **Controles flotantes** (`PanelFlotante.swift`): una píldora siempre encima de las demás
+  ventanas y en todos los escritorios (también sobre apps a pantalla completa). En reposo
+  muestra «● Grabar» (y «Subiendo N %» si hay una subida) y una ✕ para salir de la app; grabando,
+  el cronómetro en rojo con pausar y finalizar; en pausa, el cronómetro en amarillo con reanudar,
+  descartar (papelera) y finalizar. Descartar pide un segundo clic en 4 s («¿Descartar? Pulsa de
+  nuevo»), borra el MP4 a medias y no sube nada. Se arrastra
+  desde cualquier parte, recuerda su posición (abajo a la izquierda por defecto) y responde al
+  primer clic sin activar la app. No sale en el video: la captura excluye las ventanas de la
+  propia app. Se oculta con **Mostrar controles flotantes** en el menú.
+- **Pausa**: desde el panel o el menú. En pausa se descartan las muestras de ScreenCaptureKit y
+  al reanudar se les resta el tiempo pausado, así que el MP4 sale continuo, sin huecos ni
+  congelados; el cronómetro no cuenta las pausas.
+- Icono en la barra de menú: iniciar/finalizar, pausar/reanudar, descartar (con confirmación),
+  abrir carpeta, audio del sistema.
 - Atajo global: **⌥⇧L** inicia la grabación y, pulsado de nuevo, la finaliza (el mismo atajo
   alterna). Se define en `AppDelegate.applicationDidFinishLaunching`.
 - Permisos que pide la primera vez: Grabación de pantalla y Micrófono.
