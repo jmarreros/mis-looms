@@ -33,9 +33,7 @@
 <main class="publica">
     {{-- Lleva a la raíz: con sesión de administrador abre el listado de videos; sin ella, el login. --}}
     <a class="marca" href="{{ url('/') }}" title="Ir al inicio"><img src="{{ asset('logo.svg') }}" alt="">{{ config('app.name') }}</a>
-    <video class="reproductor" controls autoplay playsinline preload="metadata"
-           @if ($video->urlMiniatura()) poster="{{ $video->urlMiniatura() }}" @endif
-           src="{{ $video->urlVideo() }}"></video>
+    @include('partials.reproductor', ['video' => $video, 'autoplay' => true])
     <div class="titulo-pagina">
         <h1>{{ $video->titulo() }}</h1>
         <span class="suave">

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\PerfilController;
 use App\Http\Controllers\Admin\TokenController;
 use App\Http\Controllers\Admin\VideoAdminController;
 use App\Http\Controllers\Auth\LoginController;
@@ -26,6 +27,9 @@ Route::middleware('auth')->prefix('admin')->name('admin.')->group(function () {
     Route::get('/videos/{video:slug}', [VideoAdminController::class, 'show'])->name('videos.show');
     Route::patch('/videos/{video:slug}', [VideoAdminController::class, 'update'])->name('videos.update');
     Route::delete('/videos/{video:slug}', [VideoAdminController::class, 'destroy'])->name('videos.destroy');
+    Route::get('/perfil', [PerfilController::class, 'show'])->name('perfil');
+    Route::patch('/perfil', [PerfilController::class, 'actualizar'])->name('perfil.actualizar');
+    Route::put('/perfil/password', [PerfilController::class, 'cambiarPassword'])->name('perfil.password');
     Route::get('/token', [TokenController::class, 'show'])->name('token');
     Route::post('/token', [TokenController::class, 'regenerar'])->name('token.regenerar');
 });

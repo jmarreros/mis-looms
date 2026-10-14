@@ -17,7 +17,7 @@
         <a href="{{ route('admin.token') }}" @class(['activo' => request()->routeIs('admin.token*')])>Token de la app</a>
     </nav>
     <div class="cuenta">
-        <span class="avatar" title="{{ auth()->user()->email }}">{{ mb_strtoupper(mb_substr(auth()->user()->name ?: auth()->user()->email, 0, 1)) }}</span>
+        <a class="avatar" href="{{ route('admin.perfil') }}" title="Mi perfil · {{ auth()->user()->email }}">{{ mb_strtoupper(mb_substr(auth()->user()->name ?: auth()->user()->email, 0, 1)) }}</a>
         <form method="POST" action="{{ route('logout') }}">
             @csrf
             <button class="boton chico" type="submit">@include('partials.icono', ['nombre' => 'salir']) Salir</button>

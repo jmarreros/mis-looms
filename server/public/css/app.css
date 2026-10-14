@@ -120,6 +120,9 @@ input::placeholder { color: var(--neutro-600); }
     width: 34px; height: 34px; border-radius: 50%; background: var(--salvia-700); color: var(--salvia-100);
     display: grid; place-items: center; font-weight: 700; font-size: 14px;
 }
+.avatar:hover, .avatar:focus-visible { box-shadow: var(--aro-foco); }
+.formulario { display: flex; flex-direction: column; gap: 16px; }
+.formulario h2 { font-size: 24px; }
 .cuenta .boton { color: var(--neutro-300); }
 
 /* — Contenido — */
@@ -212,6 +215,73 @@ input::placeholder { color: var(--neutro-600); }
 .detalle .columna-video { grid-column: span 2; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 @media (max-width: 760px) { .detalle .columna-video { grid-column: auto; } }
 .reproductor { width: 100%; aspect-ratio: 16/9; border-radius: var(--radio); background: #000; display: block; }
+/* Reproductor con controles propios (public/js/reproductor.js). Sin JS quedan los nativos. */
+.reproductor-marco { position: relative; border-radius: var(--radio); overflow: hidden; background: #000; }
+.reproductor-marco:focus-visible { outline: none; box-shadow: var(--aro-foco); }
+.con-controles .reproductor { cursor: pointer; }
+.capa-centro {
+    position: absolute; inset: 0; display: none; place-items: center; pointer-events: none;
+    background: rgb(0 0 0 / 0.4);
+}
+.capa-centro > * { pointer-events: auto; box-shadow: 0 8px 32px rgb(0 0 0 / 0.45); }
+.reproductor-marco.terminado .capa-repetir, .reproductor-marco.sin-empezar .capa-inicio { display: grid; }
+.capa-inicio { background: rgb(0 0 0 / 0.2); }
+.boton-inicio {
+    width: 76px; height: 76px; padding: 0 0 0 4px; border: 0; border-radius: 50%; cursor: pointer;
+    display: grid; place-items: center; background: var(--acento-500); color: var(--fondo);
+}
+.boton-inicio:hover { background: var(--acento-400); }
+.boton-inicio:focus-visible { outline: none; box-shadow: var(--aro-foco), 0 8px 32px rgb(0 0 0 / 0.45); }
+
+.controles {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; flex-direction: column; gap: 2px;
+    padding: 36px 14px 10px; background: linear-gradient(transparent, rgb(0 0 0 / 0.75)); color: #fff;
+    transition: opacity 0.2s;
+}
+.controles[hidden] { display: none; }
+.reproductor-marco.inactivo .controles { opacity: 0; pointer-events: none; }
+.reproductor-marco.inactivo { cursor: none; }
+.reproductor-marco.inactivo .reproductor { cursor: none; }
+.controles .fila { display: flex; align-items: center; gap: 2px; }
+.controles .espacio { flex: 1; }
+.control {
+    width: 38px; height: 38px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center;
+    background: none; color: #fff; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.control:hover { background: rgb(255 255 255 / 0.15); }
+.control:focus-visible { outline: none; box-shadow: var(--aro-foco); }
+.control.velocidad { width: auto; min-width: 44px; padding: 0 10px; border-radius: 999px; }
+.control .principal, .control.activo .alterno { display: contents; }
+.control .alterno, .control.activo .principal { display: none; }
+.tiempo { margin-left: 8px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.barra {
+    --progreso: 0%;
+    width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+}
+.barra::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--acento-500) var(--progreso), rgb(255 255 255 / 0.3) var(--progreso));
+}
+.barra::-moz-range-track {
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(to right, var(--acento-500) var(--progreso), rgb(255 255 255 / 0.3) var(--progreso));
+}
+.barra::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border: 0; border-radius: 50%; background: var(--acento-400); }
+.barra::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--acento-400); }
+.barra:focus-visible { outline: none; }
+.barra:focus-visible::-webkit-slider-thumb { box-shadow: var(--aro-foco); }
+.barra:focus-visible::-moz-range-thumb { box-shadow: var(--aro-foco); }
+
+/* Pantalla completa sobre el marco (no sobre el <video>) para que las capas y los controles se vean. */
+.reproductor-marco:fullscreen { border-radius: 0; }
+.reproductor-marco:fullscreen .reproductor {
+    position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; aspect-ratio: auto; border-radius: 0; object-fit: contain;
+}
+.reproductor-marco:-webkit-full-screen { border-radius: 0; width: 100%; height: 100%; }
+.reproductor-marco:-webkit-full-screen .reproductor {
+    position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; aspect-ratio: auto; border-radius: 0; object-fit: contain;
+}
 .columna-video h1 { font-size: 34px; line-height: 1.1; word-break: break-word; }
 .lateral { display: flex; flex-direction: column; gap: 18px; padding: 26px; border-radius: var(--radio); background: var(--neutro-900); }
 .bloque { display: flex; flex-direction: column; gap: 10px; }

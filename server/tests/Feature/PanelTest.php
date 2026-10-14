@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\User;
 use App\Models\Video;
 use App\Services\VideoStorage;
+use App\Mail\PrimeraVisita;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\Fake\FakeVideoStorage;
 use Tests\TestCase;
 
@@ -46,6 +48,47 @@ class PanelTest extends TestCase
             ->assertSee('noindex', false);
 
         $this->assertSame(1, $v->fresh()->views);
+    }
+
+    public function test_el_reproductor_ofrece_ver_de_nuevo_con_y_sin_sesion(): void
+    {
+        $v = $this->video();
+
+        $this->get("/v/{$v->slug}")
+            ->assertOk()
+            ->assertSee('data-repetir', false)
+            ->assertSee('Ver de nuevo')
+            ->assertSee('js/reproductor.js', false);
+
+        $this->actingAs(User::factory()->create())->get("/v/{$v->slug}")
+            ->assertOk()
+            ->assertSee('data-repetir', false)
+            ->assertSee('data-pantalla-completa', false);
+    }
+
+    public function test_avisa_por_correo_solo_en_la_primera_visita_anonima(): void
+    {
+        Mail::fake();
+        User::factory()->create(['email' => 'admin@x.com']);
+        $v = $this->video();
+
+        $this->get("/v/{$v->slug}")->assertOk();
+        $this->get("/v/{$v->slug}")->assertOk();
+
+        Mail::assertSentCount(1);
+        Mail::assertSent(PrimeraVisita::class, fn ($m) => $m->hasTo('admin@x.com'));
+        $this->assertSame(2, $v->fresh()->views);
+    }
+
+    public function test_la_visita_del_administrador_no_envia_correo(): void
+    {
+        Mail::fake();
+        $admin = User::factory()->create();
+        $v = $this->video();
+
+        $this->actingAs($admin)->get("/v/{$v->slug}")->assertOk();
+
+        Mail::assertNothingSent();
     }
 
     public function test_las_vistas_del_administrador_no_cuentan(): void

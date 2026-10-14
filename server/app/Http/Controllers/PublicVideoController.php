@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Video;
+use App\Mail\PrimeraVisita;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 
 class PublicVideoController extends Controller
 {
@@ -17,8 +20,28 @@ class PublicVideoController extends Controller
             return view('admin.video', ['video' => $video]);
         }
 
-        $video->increment('views');
+        // El UPDATE condicionado es atómico: solo una petición pasa de 0 a 1 visitas y envía el aviso.
+        $primera = Video::whereKey($video->id)->where('views', 0)->update(['views' => 1]) === 1;
+        if ($primera) {
+            $this->avisarPrimeraVisita($video);
+        } else {
+            $video->increment('views');
+        }
 
         return view('publico.video', ['video' => $video]);
+    }
+
+    /** Avisa al administrador por correo; un fallo de envío no debe romper la página pública. */
+    private function avisarPrimeraVisita(Video $video): void
+    {
+        $destino = User::orderBy('id')->value('email');
+        if (! $destino) {
+            return;
+        }
+        try {
+            Mail::to($destino)->send(new PrimeraVisita($video));
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 }

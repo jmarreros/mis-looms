@@ -7,9 +7,7 @@
     <div class="detalle">
         <div class="columna-video">
             @if ($video->estaListo())
-                <video class="reproductor" controls playsinline preload="metadata"
-                       @if ($video->urlMiniatura()) poster="{{ $video->urlMiniatura() }}" @endif
-                       src="{{ $video->urlVideo() }}"></video>
+                @include('partials.reproductor', ['video' => $video])
             @else
                 @include('partials.miniatura', ['video' => $video])
             @endif

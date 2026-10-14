@@ -28,6 +28,15 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
 - Página pública `/v/{slug}`: con sesión de administrador muestra el detalle del panel (copiar
   enlace, renombrar, eliminar; sus visitas no cuentan); sin sesión, la página pública sin esas
   opciones. Tras grabar, la app de macOS abre esta URL en el navegador.
+- Reproductor (`partials/reproductor.blade.php` + `public/js/reproductor.js`, en la página pública
+  y en el detalle) con **controles propios** (reproducir, volumen, tiempo, barra, velocidad,
+  pantalla completa; atajos espacio/k, f, m, flechas). Al terminar muestra «Ver de nuevo» en el
+  centro, también en pantalla completa, porque esta se hace sobre el marco (video + capas): la
+  nativa del `<video>` no deja poner nada encima, y con los controles nativos Chrome dejaba su
+  botón de pantalla completa (deshabilitado) además del propio. Sin JS quedan los nativos.
+  Probado con Playwright en Chrome, Firefox y WebKit (para buscar en la barra, el servidor de
+  pruebas debe admitir peticiones por rangos; `python -m http.server` no las admite).
+- CSS y JS se enlazan con `?v=filemtime(...)` para que el navegador no use copias viejas.
 - Panel web: siempre en modo oscuro, según el diseño de Claude Design (sistema "Organic":
   fondo `#1c1a17`, acento terracota `#d67f48`, salvia de segundo color, títulos Caprasimo
   y texto Figtree de Google Fonts, botones y campos en píldora). Todo en
@@ -82,12 +91,18 @@ de Ajustes, clic en la notificación) no se verificó automáticamente.
   (vuelve a la misma página; no deja páginas vacías), detalle del video, token. 33 pruebas.
 - Logo naranja en `marca/` (app, favicon, panel).
 
+**Controles flotantes y pausa en macOS (2026-10-14), hecho sin probar grabando:** píldora
+siempre visible (`PanelFlotante.swift`: grabar, cronómetro, pausar/reanudar, finalizar,
+descartar en pausa con doble clic de confirmación, salir en reposo; excluida del video) porque el atajo ⌥⇧L no le funciona bien al usuario; pausa en `Recorder`
+descartando muestras y restando el tiempo pausado. Verificado solo el dibujo del panel fuera de
+pantalla; falta que el usuario pruebe una grabación con pausas (continuidad del audio/video).
+
 **Decisión (2026-10-13): la app de Linux queda en pausa**; el foco es la app de macOS y el
 backend Laravel.
 
 **Siguiente:** desplegar en cPanel (`docs/despliegue.md`: dominio con HTTPS, PHP ≥ 8.2, SSH,
 claves nuevas en el `.env` del servidor) y hacer una grabación real de punta a punta. Después:
-abrir la app al iniciar sesión, pausa y cuenta regresiva, mezclar el audio del sistema con el
+abrir la app al iniciar sesión, cuenta regresiva, mezclar el audio del sistema con el
 micrófono, script `instalar.sh`, videos privados («solo yo») y cambio de contraseña desde el panel.
 
 Al terminar una fase o tomar una decisión nueva, actualizar esta sección.
