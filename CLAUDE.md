@@ -107,8 +107,10 @@ backend Laravel.
 Hostinger, nginx + php-fpm 8.4, junto a Mis Videos; no es cPanel). Base SQLite copiada de local,
 S3 y correo con Resend verificados desde el servidor. Detalles y cómo actualizar: `docs/despliegue.md`.
 
-**Siguiente:** apuntar la app de macOS a `https://jmarreros.com/mis-looms` y hacer una grabación
-real de punta a punta. Después:
+La app de macOS ya apunta a `https://jmarreros.com/mis-looms` («Probar conexión» correcto, con el
+token copiado de la base local).
+
+**Siguiente:** hacer una grabación real de punta a punta contra producción. Después:
 abrir la app al iniciar sesión, mezclar el audio del sistema con el
 micrófono, script `instalar.sh`, videos privados («solo yo») y cambio de contraseña desde el panel.
 
