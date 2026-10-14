@@ -34,6 +34,20 @@ Aviso de la primera visita anónima a un video (`App\Mail\PrimeraVisita`, al cor
   `MAIL_FROM_ADDRESS="avisos@tu-dominio"`, `MAIL_FROM_NAME="Mis Looms"`. El paquete `resend/resend-php`
   ya está en `composer.json`. Los fallos de envío no rompen la página; quedan en `storage/logs`.
 
+## Producción: https://jmarreros.com/mis-looms (VPS de Hostinger, `ssh hostinger`)
+Desplegado el 2026-10-14 junto a Mis Videos, con el mismo esquema (ver `/var/www/jmarreros.com/LEEME.md`
+en el servidor):
+- Repo clonado en `/var/www/jmarreros.com/mis-looms` con sparse checkout (solo `server/`); nginx (php-fpm 8.4)
+  sirve `server/public/` desde `/etc/nginx/jmarreros.com/apps/mis-looms.conf` con
+  `SCRIPT_NAME=/mis-looms/index.php`, así Laravel genera las URLs con la subcarpeta.
+- `.env`: `APP_URL`/`ASSET_URL=https://jmarreros.com/mis-looms`, `SESSION_PATH=/mis-looms`,
+  `SESSION_COOKIE=mis_looms_session`, `SESSION_SECURE_COOKIE=true`, SQLite con ruta absoluta, Resend.
+- Cron del usuario `jmarreros`: `schedule:run` cada minuto.
+- Actualizar (sin sudo): `bash /var/www/jmarreros.com/actualizar-mis-looms.sh` (git pull, composer, migrate, cachés).
+- **No usar `route:cache` ni `php artisan optimize`**: en subcarpeta la raíz responde 405. Por lo mismo,
+  en el código nada de rutas fijas (`Route::redirect('/', '/admin')` sacaba de la subcarpeta): usar `route()`.
+- App de macOS: URL del servidor `https://jmarreros.com/mis-looms`.
+
 ## cPanel (hosting compartido, SSH + cron)
 1. Subir `server/` (sin `vendor/` ni `.env`) y ejecutar `composer install --no-dev -o`.
    Requiere PHP ≥ 8.3 y salida HTTPS hacia AWS.

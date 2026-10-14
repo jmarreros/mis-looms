@@ -7,7 +7,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\PublicVideoController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/admin');
+// Con route() y no Route::redirect('/', '/admin'): así respeta la subcarpeta (jmarreros.com/mis-looms).
+Route::get('/', fn () => redirect()->route('admin.videos.index'));
 
 // Página pública para compartir.
 Route::get('/v/{slug}', [PublicVideoController::class, 'show'])

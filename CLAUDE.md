@@ -103,8 +103,12 @@ pantalla (`CuentaRegresiva.swift`) y en el panel, cancelable; opción en el men�
 **Decisión (2026-10-13): la app de Linux queda en pausa**; el foco es la app de macOS y el
 backend Laravel.
 
-**Siguiente:** desplegar en cPanel (`docs/despliegue.md`: dominio con HTTPS, PHP ≥ 8.2, SSH,
-claves nuevas en el `.env` del servidor) y hacer una grabación real de punta a punta. Después:
+**Despliegue (2026-10-14), hecho:** en producción en https://jmarreros.com/mis-looms (VPS de
+Hostinger, nginx + php-fpm 8.4, junto a Mis Videos; no es cPanel). Base SQLite copiada de local,
+S3 y correo con Resend verificados desde el servidor. Detalles y cómo actualizar: `docs/despliegue.md`.
+
+**Siguiente:** apuntar la app de macOS a `https://jmarreros.com/mis-looms` y hacer una grabación
+real de punta a punta. Después:
 abrir la app al iniciar sesión, mezclar el audio del sistema con el
 micrófono, script `instalar.sh`, videos privados («solo yo») y cambio de contraseña desde el panel.
 
