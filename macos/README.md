@@ -29,6 +29,10 @@ cada compilación.
   desde cualquier parte, recuerda su posición (abajo a la izquierda por defecto) y responde al
   primer clic sin activar la app. No sale en el video: la captura excluye las ventanas de la
   propia app. Se oculta con **Mostrar controles flotantes** en el menú.
+- **Cuenta regresiva** (`CuentaRegresiva.swift`): al pulsar «Grabar» sale un 3, 2, 1 grande en el
+  centro de la pantalla (con un anillo que se vacía cada segundo) y «Empieza en N» en el panel,
+  con una ✕ para cancelar (también cancela ⌥⇧L o el menú). La captura empieza al llegar a cero y
+  la cuenta no sale en el video. Se desactiva en el menú: **Cuenta regresiva de 3 s**.
 - **Pausa**: desde el panel o el menú. En pausa se descartan las muestras de ScreenCaptureKit y
   al reanudar se les resta el tiempo pausado, así que el MP4 sale continuo, sin huecos ni
   congelados; el cronómetro no cuenta las pausas.

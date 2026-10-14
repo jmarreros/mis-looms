@@ -97,12 +97,15 @@ descartar en pausa con doble clic de confirmación, salir en reposo; excluida de
 descartando muestras y restando el tiempo pausado. Verificado solo el dibujo del panel fuera de
 pantalla; falta que el usuario pruebe una grabación con pausas (continuidad del audio/video).
 
+**Cuenta regresiva en macOS (2026-10-14), hecha sin probar grabando:** 3, 2, 1 en el centro de la
+pantalla (`CuentaRegresiva.swift`) y en el panel, cancelable; opción en el menú (activa por defecto).
+
 **Decisión (2026-10-13): la app de Linux queda en pausa**; el foco es la app de macOS y el
 backend Laravel.
 
 **Siguiente:** desplegar en cPanel (`docs/despliegue.md`: dominio con HTTPS, PHP ≥ 8.2, SSH,
 claves nuevas en el `.env` del servidor) y hacer una grabación real de punta a punta. Después:
-abrir la app al iniciar sesión, cuenta regresiva, mezclar el audio del sistema con el
+abrir la app al iniciar sesión, mezclar el audio del sistema con el
 micrófono, script `instalar.sh`, videos privados («solo yo») y cambio de contraseña desde el panel.
 
 Al terminar una fase o tomar una decisión nueva, actualizar esta sección.

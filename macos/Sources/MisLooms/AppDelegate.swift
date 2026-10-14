@@ -15,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     private let ajustes = VentanaAjustes()
     private let panel = PanelFlotante()
+    private let cuenta = CuentaRegresiva()
+    private var arranque: Task<Void, Never>?  // de pulsar «Grabar» a tener la captura en marcha
+    private var faltan: Int?  // segundos de la cuenta regresiva en curso
     private var subida: Task<Void, Never>?  // subidas pendientes, una detrás de otra
     private var progresoSubida: Int?  // 0–100 mientras se sube
     private var fallidas: Set<String> = []  // fallaron en esta sesión: no se reintentan solas
@@ -38,6 +41,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private static let claveAudioSistema = "grabarAudioDelSistema"  // false por defecto
     private static let claveAbrirEnlace = "abrirEnlaceAlTerminar"  // true por defecto
     private static let claveMostrarPanel = "mostrarPanelFlotante"  // true por defecto
+    private static let claveCuentaRegresiva = "cuentaRegresiva"  // true por defecto
+    private static let segundosCuenta = 3
+
+    private var conCuentaRegresiva: Bool {
+        get { UserDefaults.standard.object(forKey: Self.claveCuentaRegresiva) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: Self.claveCuentaRegresiva) }
+    }
 
     private var mostrarPanel: Bool {
         get { UserDefaults.standard.object(forKey: Self.claveMostrarPanel) as? Bool ?? true }
@@ -77,6 +87,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         panel.alReanudar = { [weak self] in self?.reanudar() }
         panel.alDescartar = { [weak self] in self?.descartar() }
         panel.alSalir = { NSApp.terminate(nil) }
+        panel.alCancelarCuenta = { [weak self] in self?.cancelarCuenta() }
         if mostrarPanel { panel.mostrar() }
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -97,6 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     /// Atajo y menú: inicia la grabación si no hay una en curso y la finaliza si la hay.
     private func alternarGrabacion() {
+        if faltan != nil { cancelarCuenta(); return }  // durante la cuenta, el mismo gesto la cancela
         guard !ocupado, !finalizando else { return }
         if recorder.grabando { detener() } else { iniciar() }
     }
@@ -104,12 +116,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func iniciar() {
         ocupado = true
         actualizarInterfaz()
-        Task {
-            defer { ocupado = false; actualizarInterfaz() }
+        arranque = Task {
+            defer {
+                ocupado = false
+                arranque = nil
+                actualizarInterfaz()
+            }
             guard await AVCaptureDevice.requestAccess(for: .audio) else {
                 avisarPermiso("Micrófono")
                 return
             }
+            if conCuentaRegresiva, !(await contarHastaCero()) { return }
             do {
                 try FileManager.default.createDirectory(at: carpeta, withIntermediateDirectories: true)
                 let formato = DateFormatter()
@@ -130,6 +147,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
                 }
             }
         }
+    }
+
+    /// 3, 2, 1 en pantalla y en el panel. Devuelve false si se canceló.
+    private func contarHastaCero() async -> Bool {
+        defer {
+            faltan = nil
+            cuenta.ocultar()
+            actualizarInterfaz()
+        }
+        for n in stride(from: Self.segundosCuenta, through: 1, by: -1) {
+            faltan = n
+            cuenta.mostrar(n)
+            actualizarInterfaz()
+            do { try await Task.sleep(for: .seconds(1)) } catch { return false }
+        }
+        return true
+    }
+
+    private func cancelarCuenta() {
+        guard faltan != nil else { return }
+        arranque?.cancel()
     }
 
     private func pausar() {
@@ -223,7 +261,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         } else {
             boton.image = Self.iconoReposo
             boton.title = progresoSubida.map { " Subiendo \($0)%" } ?? ""
-            panel.actualizar(ocupado ? .iniciando : .reposo(subida: progresoSubida))
+            if let faltan {
+                boton.title = " Empieza en \(faltan)"
+                panel.actualizar(.cuentaRegresiva(faltan))
+            } else {
+                panel.actualizar(ocupado ? .iniciando : .reposo(subida: progresoSubida))
+            }
         }
         item.menu = construirMenu()
     }
@@ -231,11 +274,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     private func construirMenu() -> NSMenu {
         let menu = NSMenu()
 
-        let alternar = NSMenuItem(title: finalizando ? "Finalizando grabación…" : recorder.grabando ? "Finalizar grabación" : "Iniciar grabación",
-                                  action: #selector(alternarDesdeMenu), keyEquivalent: "l")
+        let titulo = faltan != nil ? "Cancelar cuenta regresiva"
+            : finalizando ? "Finalizando grabación…" : recorder.grabando ? "Finalizar grabación" : "Iniciar grabación"
+        let alternar = NSMenuItem(title: titulo, action: #selector(alternarDesdeMenu), keyEquivalent: "l")
         alternar.keyEquivalentModifierMask = [.option, .shift]
         alternar.target = self
-        alternar.isEnabled = !ocupado && !finalizando
+        alternar.isEnabled = faltan != nil || (!ocupado && !finalizando)
         menu.addItem(alternar)
 
         if recorder.grabando {
@@ -273,6 +317,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         sistema.state = audioDelSistema ? .on : .off
         sistema.isEnabled = !recorder.grabando
         menu.addItem(sistema)
+
+        let cuentaAtras = NSMenuItem(title: "Cuenta regresiva de \(Self.segundosCuenta) s", action: #selector(cambiarCuentaRegresiva), keyEquivalent: "")
+        cuentaAtras.target = self
+        cuentaAtras.state = conCuentaRegresiva ? .on : .off
+        menu.addItem(cuentaAtras)
 
         let abrirNavegador = NSMenuItem(title: "Abrir el enlace al terminar", action: #selector(cambiarAbrirEnlace), keyEquivalent: "")
         abrirNavegador.target = self
@@ -330,6 +379,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
 
     @objc private func cambiarAudioSistema() {
         audioDelSistema.toggle()
+        actualizarInterfaz()
+    }
+
+    @objc private func cambiarCuentaRegresiva() {
+        conCuentaRegresiva.toggle()
         actualizarInterfaz()
     }
 

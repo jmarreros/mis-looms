@@ -4,6 +4,7 @@ import AppKit
 enum EstadoPanel: Equatable {
     case reposo(subida: Int?)  // listo para grabar; con el % si hay una subida en curso
     case iniciando
+    case cuentaRegresiva(Int)  // segundos que faltan para empezar a grabar
     case grabando(segundos: Int)
     case pausado(segundos: Int)
     case finalizando
@@ -22,6 +23,7 @@ final class PanelFlotante {
     var alFinalizar: (() -> Void)?
     var alDescartar: (() -> Void)?
     var alSalir: (() -> Void)?
+    var alCancelarCuenta: (() -> Void)?
 
     private static let alto: CGFloat = 44
     private static let margen: CGFloat = 24
@@ -42,6 +44,7 @@ final class PanelFlotante {
     private let botonFinalizar: BotonRedondo
     private let botonDescartar: BotonRedondo
     private let botonSalir: BotonRedondo
+    private let botonCancelar: BotonRedondo
     private var estado: EstadoPanel?
     /// Descartar borra la grabación: el primer clic pide confirmación y el segundo descarta.
     private var confirmandoDescarte = false
@@ -66,6 +69,7 @@ final class PanelFlotante {
         botonFinalizar = BotonRedondo(simbolo: "stop.fill", descripcion: "Finalizar", color: .systemRed)
         botonDescartar = BotonRedondo(simbolo: "trash", descripcion: "Descartar y empezar de nuevo")
         botonSalir = BotonRedondo(simbolo: "xmark", descripcion: "Salir de Mis Looms", color: Self.apagado)
+        botonCancelar = BotonRedondo(simbolo: "xmark", descripcion: "Cancelar")
 
         let contenido = Fondo()
         contenido.wantsLayer = true
@@ -89,13 +93,15 @@ final class PanelFlotante {
         botonDescartar.action = #selector(pulsarDescartar)
         botonSalir.target = self
         botonSalir.action = #selector(pulsarSalir)
+        botonCancelar.target = self
+        botonCancelar.action = #selector(pulsarCancelar)
 
         pila.orientation = .horizontal
         pila.alignment = .centerY
         pila.spacing = 10
         pila.edgeInsets = NSEdgeInsets(top: 0, left: 14, bottom: 0, right: 6)
         pila.translatesAutoresizingMaskIntoConstraints = false
-        for vista in [indicador, etiqueta, botonGrabar, botonSalir, botonPausa, botonDescartar, botonFinalizar] as [NSView] {
+        for vista in [indicador, etiqueta, botonGrabar, botonSalir, botonCancelar, botonPausa, botonDescartar, botonFinalizar] as [NSView] {
             pila.addArrangedSubview(vista)
         }
         pila.setCustomSpacing(14, after: etiqueta)
@@ -133,6 +139,7 @@ final class PanelFlotante {
         guard let estado else { return }
         botonGrabar.isHidden = true
         botonSalir.isHidden = true
+        botonCancelar.isHidden = true
         botonPausa.isHidden = true
         botonDescartar.isHidden = true
         botonFinalizar.isHidden = true
@@ -154,6 +161,10 @@ final class PanelFlotante {
         case .iniciando:
             indicador.image = Self.simbolo("hourglass", Self.acento)
             etiqueta.stringValue = "Preparando…"
+        case .cuentaRegresiva(let faltan):
+            indicador.image = Self.simbolo("timer", Self.acento)
+            etiqueta.stringValue = "Empieza en \(faltan)"
+            botonCancelar.isHidden = false
         case .grabando(let segundos):
             indicador.image = Self.simbolo("circle.fill", .systemRed)
             etiqueta.stringValue = Self.reloj(segundos)
@@ -186,6 +197,7 @@ final class PanelFlotante {
 
     @objc private func pulsarGrabar() { alGrabar?() }
     @objc private func pulsarSalir() { alSalir?() }
+    @objc private func pulsarCancelar() { alCancelarCuenta?() }
 
     @objc private func pulsarFinalizar() {
         cancelarConfirmacion()
