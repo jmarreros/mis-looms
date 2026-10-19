@@ -42,7 +42,7 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
   y texto Figtree de Google Fonts, botones y campos en píldora). Todo en
   `server/public/css/app.css`.
 
-## Estado (2026-10-13)
+## Estado (2026-10-19)
 
 **Fase 1 — HECHA y probada.** `linux/` en Rust (todavía sin GTK):
 - Daemon `mis-looms` con icono en la bandeja (ksni) y servicio D-Bus
@@ -101,7 +101,22 @@ pantalla; falta que el usuario pruebe una grabación con pausas (continuidad del
 pantalla (`CuentaRegresiva.swift`) y en el panel, cancelable; opción en el menú (activa por defecto).
 
 **Decisión (2026-10-13): la app de Linux queda en pausa**; el foco es la app de macOS y el
-backend Laravel.
+backend Laravel. **Retomada el 2026-10-19** (ver abajo).
+
+**App de Linux al nivel de macOS (2026-10-19), hecha.** `linux/` (Rust): GTK4 + gtk4-layer-shell
+en el hilo principal y el controlador en tokio. Píldora flotante (grabar, cronómetro, pausa,
+descartar con doble clic, finalizar, salir; se arrastra con el cursor global de Hyprland),
+cuenta regresiva 3-2-1 (el portal se pide antes), pausa con sondas antes de los encoders,
+subida multipart igual que macOS (estado en `~/.local/state/mis-looms/subidas/`, reanuda al
+abrir), miniatura y metadatos con GStreamer, enlace con `wl-copy` + notificación + navegador,
+ventana de Ajustes (URL en `config.json`, token en el llavero con `secret-tool`), bandeja con
+el mismo menú, CLI `subir`/`reanudar`/`ajustes`/`pause`. Probado: grabación con pausa (MP4
+continuo, sin huecos, audio y video alineados) y subida contra un servidor simulado local
+(4 partes idénticas byte a byte, reintento, `kill -9` + reanudar, Ctrl+C aborta, token
+inválido, daemon de punta a punta). **Falta:** configurar URL + token en este ordenador y
+probar contra producción; arrastrar la píldora con el ratón; clic en la notificación.
+La píldora **sí sale en el video** (Wayland no deja excluirla; `no_screen_share` de Hyprland
+pinta un rectángulo negro).
 
 **Despliegue (2026-10-14), hecho:** en producción en https://jmarreros.com/mis-looms (VPS de
 Hostinger, nginx + php-fpm 8.4, junto a Mis Videos; no es cPanel). Base SQLite copiada de local,
@@ -116,12 +131,14 @@ micrófono, script `instalar.sh`, videos privados («solo yo») y cambio de cont
 
 Al terminar una fase o tomar una decisión nueva, actualizar esta sección.
 
-## Preparar un ordenador nuevo
+## Preparar un ordenador nuevo (Linux)
 
-1. Instalar dependencias y compilar según `linux/README.md`.
-2. `ln -s "$PWD/linux/target/release/mis-looms" ~/.local/bin/mis-looms`
-3. Ejecutar `mis-looms` una vez para que cree `~/.config/mis-looms/config.json` y
-   ajustar `"record_system_audio": false` (preferencia del usuario).
-4. Opcional, en la config de Hyprland: `exec-once = mis-looms` y
-   `bind = SUPER SHIFT, R, exec, mis-looms toggle`.
-5. La primera grabación pide elegir la pantalla (el restore token es por máquina).
+1. Instalar dependencias según `linux/README.md`.
+2. `linux/instalar.sh`: compila, enlaza `~/.local/bin/mis-looms` y crea el acceso «Mis Looms»
+   en el lanzador de Omarchy (con icono).
+3. Abrir la app una vez para que cree `~/.config/mis-looms/config.json`
+   (`"record_system_audio": false` ya es el valor por defecto, preferencia del usuario).
+4. Bandeja › Ajustes… (o `mis-looms ajustes`): URL `https://jmarreros.com/mis-looms` + token.
+5. Opcional, Omarchy (Hyprland en Lua): `o.launch_on_start("mis-looms")` en `autostart.lua` y
+   `o.bind("SUPER + SHIFT + R", "Mis Looms", "mis-looms toggle")` en `bindings.lua`.
+6. La primera grabación pide elegir la pantalla (el restore token es por máquina).

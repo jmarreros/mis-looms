@@ -49,7 +49,7 @@ Varios dependen del hardware: en otra máquina conviene volver a medir.
 ## Audio
 
 - El usuario graba solo el micrófono: `"record_system_audio": false` en
-  `~/.config/mis-looms/config.json` (el valor por defecto del código es `true`).
+  `~/.config/mis-looms/config.json` (desde 2026-10-19 también es el valor por defecto).
 - En el iMac original, Mic Boost +20 dB y Capture +12 dB metían un ruido grave de
   fondo; bajarlos si molesta.
 
@@ -61,3 +61,23 @@ GST_DEBUG="2,pipewiresrc:5,basesrc:4,qtmux:4" GST_DEBUG_FILE=/tmp/gst.log mis-lo
 
 Contar `stream state paused` en el log para detectar renegociaciones.
 `ptrace_scope=1` impide usar gdb sin sudo.
+
+## Pausa (2026-10-19)
+
+- No se pausa el pipeline (las fuentes en vivo y xdph renegocian). Se ponen sondas de buffer en
+  `vpause` (cola antes de x264) y `apause` (cola tras `audiomixer`): se descartan los buffers con
+  PTS dentro de un tramo en pausa y a los posteriores se les resta lo pausado.
+- Las sondas van **después** de `audiomixer`: si se adelantan las marcas antes, audiomixer (en
+  vivo, agrega por reloj) considera el audio atrasado y lo tira.
+- Verificado: 10,6 s de reloj con 3 s de pausa → MP4 de 7,6 s sin huecos de video ni audio.
+
+## Píldora flotante y Hyprland
+
+- `hl.layer_rule({ ..., no_screen_share = true })` funciona con capas, pero pinta un
+  rectángulo negro en la captura en vez de ocultarla: por eso no se usa y la píldora sale en el
+  video.
+- `hyprctl keyword` ya no sirve con la configuración en Lua; las reglas se aplican con
+  `hyprctl eval 'hl.layer_rule({...})'`.
+- Una superficie layer-shell no sabe su posición global: para arrastrar se lee el cursor del
+  socket de Hyprland (`j/cursorpos`) y se mueven los márgenes.
+- Las ventanas de GTK4 no encogen solas: tras cambiar los botones, `set_default_size(1, 1)`.

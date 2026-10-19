@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Mis Looms
+GenericName=Grabador de pantalla
+Comment=Graba la pantalla y comparte un enlace
+Exec=mis-looms
+Icon=mis-looms
+Terminal=false
+Categories=AudioVideo;Video;Recorder;
+Keywords=loom;grabar;pantalla;video;screencast;
+StartupNotify=false
+Actions=Grabar;Ajustes;
+
+[Desktop Action Grabar]
+Name=Iniciar o finalizar grabación
+Exec=mis-looms toggle
+
+[Desktop Action Ajustes]
+Name=Ajustes
+Exec=mis-looms ajustes

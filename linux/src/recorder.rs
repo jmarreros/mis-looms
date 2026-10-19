@@ -1,5 +1,6 @@
 use std::os::fd::{AsRawFd, OwnedFd};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow};
@@ -12,22 +13,17 @@ use gstreamer::prelude::*;
 
 use crate::config::{self, Config};
 
-/// Una grabación en curso: pipeline de GStreamer + sesión del portal.
-pub struct Recording {
-    pub path: PathBuf,
-    pipeline: gst::Pipeline,
+/// Pantalla elegida en el portal, lista para grabar. Se pide antes de la cuenta regresiva
+/// para que el selector de pantalla (si aparece) no se coma los 3 segundos.
+pub struct Capture {
     session: Session<Screencast>,
-    // El fd de PipeWire debe vivir mientras dure el pipeline.
-    _fd: OwnedFd,
+    fd: OwnedFd,
+    node_id: u32,
+    size: Option<(i32, i32)>,
 }
 
-/// Resultado final que entrega el hilo que vigila el bus de GStreamer.
-pub type Finished = Result<()>;
-
-impl Recording {
-    /// Pide la pantalla al portal y arranca el pipeline. `on_finish` recibe
-    /// el resultado cuando el pipeline termina (EOS tras `stop`, o error).
-    pub async fn start(config: &Config, on_finish: impl FnOnce(Finished) + Send + 'static) -> Result<Self> {
+impl Capture {
+    pub async fn open() -> Result<Self> {
         let proxy = Screencast::new().await.context("portal ScreenCast no disponible")?;
         let session = proxy.create_session(Default::default()).await?;
         let token = config::load_restore_token();
@@ -50,23 +46,81 @@ impl Recording {
         config::save_restore_token(response.restore_token());
         let stream = response.streams().first().ok_or_else(|| anyhow!("el portal no devolvió ningún stream"))?.to_owned();
         let fd = proxy.open_pipe_wire_remote(&session, Default::default()).await?;
+        Ok(Self { session, fd, node_id: stream.pipe_wire_node_id(), size: stream.size() })
+    }
 
+    /// Cierra la sesión del portal sin haber grabado (cuenta regresiva cancelada).
+    pub async fn close(self) {
+        let _ = self.session.close().await;
+    }
+}
+
+/// Tramos en pausa, en tiempo de ejecución del pipeline: `(inicio, fin)`; `fin == None`
+/// mientras dura la pausa en curso.
+type Pauses = Arc<Mutex<Vec<(gst::ClockTime, Option<gst::ClockTime>)>>>;
+
+/// Una grabación en curso: pipeline de GStreamer + sesión del portal.
+pub struct Recording {
+    pub path: PathBuf,
+    pipeline: gst::Pipeline,
+    capture: Capture,
+    pauses: Pauses,
+}
+
+/// Resultado final que entrega el hilo que vigila el bus de GStreamer.
+pub type Finished = Result<()>;
+
+impl Recording {
+    /// Arranca el pipeline sobre la pantalla elegida. `on_finish` recibe el resultado
+    /// cuando el pipeline termina (EOS tras `stop`, o error).
+    pub fn start(config: &Config, capture: Capture, on_finish: impl FnOnce(Finished) + Send + 'static) -> Result<Self> {
         std::fs::create_dir_all(&config.output_dir)?;
         let path = config
             .output_dir
             .join(format!("{}.mp4", chrono::Local::now().format("%Y-%m-%d_%H-%M-%S")));
 
-        let size = output_size(stream.size(), config.max_height);
-        let description = pipeline_description(config, fd.as_raw_fd(), stream.pipe_wire_node_id(), size, &path)?;
+        let size = output_size(capture.size, config.max_height);
+        let description = pipeline_description(config, capture.fd.as_raw_fd(), capture.node_id, size, &path)?;
         let pipeline = gst::parse::launch(&description)?
             .downcast::<gst::Pipeline>()
             .map_err(|_| anyhow!("el pipeline no es un gst::Pipeline"))?;
+
+        // La pausa se aplica justo antes de los encoders: se descartan los buffers de los
+        // tramos en pausa y a los siguientes se les resta lo pausado, así el MP4 sale
+        // continuo. Más arriba no sirve: audiomixer (en vivo) tiraría el audio "atrasado".
+        let pauses: Pauses = Arc::default();
+        for name in ["vpause", "apause"] {
+            if let Some(pad) = pipeline.by_name(name).and_then(|e| e.static_pad("src")) {
+                let pauses = pauses.clone();
+                pad.add_probe(gst::PadProbeType::BUFFER, move |_, info| apply_pauses(&pauses, info));
+            }
+        }
 
         let bus = pipeline.bus().expect("un pipeline siempre tiene bus");
         pipeline.set_state(gst::State::Playing)?;
         std::thread::spawn(move || on_finish(watch_bus(&bus)));
 
-        Ok(Self { path, pipeline, session, _fd: fd })
+        Ok(Self { path, pipeline, capture, pauses })
+    }
+
+    fn running_time(&self) -> Option<gst::ClockTime> {
+        let now = self.pipeline.clock()?.time();
+        now.checked_sub(self.pipeline.base_time()?)
+    }
+
+    pub fn pause(&self) {
+        let mut pauses = self.pauses.lock().unwrap();
+        if pauses.last().is_none_or(|(_, end)| end.is_some())
+            && let Some(now) = self.running_time() {
+                pauses.push((now, None));
+            }
+    }
+
+    pub fn resume(&self) {
+        let now = self.running_time();
+        if let Some((start, end @ None)) = self.pauses.lock().unwrap().last_mut() {
+            *end = Some(now.unwrap_or(*start).max(*start));
+        }
     }
 
     /// Pide terminar: el EOS hace que mp4mux escriba el índice y cierre el archivo.
@@ -91,8 +145,30 @@ impl Recording {
         if waited.is_err() {
             eprintln!("el pipeline no se detuvo en 5 s; se abandona");
         }
-        let _ = self.session.close().await;
+        self.capture.close().await;
     }
+}
+
+/// Descarta los buffers capturados durante una pausa y adelanta los posteriores.
+fn apply_pauses(pauses: &Pauses, info: &mut gst::PadProbeInfo) -> gst::PadProbeReturn {
+    let Some(gst::PadProbeData::Buffer(buffer)) = &mut info.data else { return gst::PadProbeReturn::Ok };
+    let Some(pts) = buffer.pts() else { return gst::PadProbeReturn::Ok };
+    let mut shift = gst::ClockTime::ZERO;
+    for (start, end) in pauses.lock().unwrap().iter() {
+        match end {
+            _ if pts < *start => break,
+            Some(end) if pts >= *end => shift += *end - *start,
+            _ => return gst::PadProbeReturn::Drop,
+        }
+    }
+    if shift > gst::ClockTime::ZERO {
+        let buffer = buffer.make_mut();
+        buffer.set_pts(pts.saturating_sub(shift));
+        if let Some(dts) = buffer.dts() {
+            buffer.set_dts(dts.saturating_sub(shift));
+        }
+    }
+    gst::PadProbeReturn::Ok
 }
 
 fn watch_bus(bus: &gst::Bus) -> Finished {
@@ -164,7 +240,7 @@ fn pipeline_description(
         "mp4mux name=mux faststart=true ! filesink location=\"{location}\" \
          pipewiresrc fd={fd} path={node_id} do-timestamp=true keepalive-time=1000 always-copy=true \
          ! {leaky} ! {convert} ! video/x-raw,format=I420{scale} ! videorate ! video/x-raw,framerate={fps}/1 \
-         ! {leaky} ! {encoder} ! video/x-h264,profile=high ! h264parse ! queue ! mux.video_0 "
+         ! {leaky} name=vpause ! {encoder} ! video/x-h264,profile=high ! h264parse ! queue ! mux.video_0 "
     );
 
     let mut audio_sources = Vec::new();
@@ -182,7 +258,7 @@ fn pipeline_description(
             None => return Err(anyhow!("no hay encoder AAC (instala gst-libav)")),
         };
         desc.push_str(&format!(
-            "audiomixer name=amix ! audioconvert ! audioresample ! audio/x-raw,rate=48000,channels=2 \
+            "audiomixer name=amix ! queue name=apause ! audioconvert ! audioresample ! audio/x-raw,rate=48000,channels=2 \
              ! {aac} ! aacparse ! queue ! mux.audio_0 "
         ));
         for src in audio_sources {
