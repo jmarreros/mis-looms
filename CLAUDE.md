@@ -46,7 +46,7 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
   y texto Figtree de Google Fonts, botones y campos en píldora). Todo en
   `server/public/css/app.css`.
 
-## Estado (2026-10-19)
+## Estado (2026-11-06)
 
 **Fase 1 — HECHA y probada.** `linux/` en Rust (todavía sin GTK):
 - Daemon `mis-looms` con icono en la bandeja (ksni) y servicio D-Bus
@@ -117,8 +117,9 @@ ventana de Ajustes (URL en `config.json`, token en el llavero con `secret-tool`)
 el mismo menú, CLI `subir`/`reanudar`/`ajustes`/`pause`. Probado: grabación con pausa (MP4
 continuo, sin huecos, audio y video alineados) y subida contra un servidor simulado local
 (4 partes idénticas byte a byte, reintento, `kill -9` + reanudar, Ctrl+C aborta, token
-inválido, daemon de punta a punta). **Falta:** configurar URL + token en este ordenador y
-probar contra producción; arrastrar la píldora con el ratón; clic en la notificación.
+inválido, daemon de punta a punta). **En uso contra producción (confirmado por el usuario el
+2026-11-06):** ya graba y sube videos desde Linux. **Sin confirmar:** arrastrar la píldora con
+el ratón; clic en la notificación.
 La píldora **sí sale en el video** (Wayland no deja excluirla; `no_screen_share` de Hyprland
 pinta un rectángulo negro).
 
@@ -129,9 +130,11 @@ S3 y correo con Resend verificados desde el servidor. Detalles y cómo actualiza
 La app de macOS ya apunta a `https://jmarreros.com/mis-looms` («Probar conexión» correcto, con el
 token copiado de la base local).
 
-**Siguiente:** hacer una grabación real de punta a punta contra producción. Después:
-abrir la app al iniciar sesión, mezclar el audio del sistema con el
-micrófono, script `instalar.sh`, videos privados («solo yo») y cambio de contraseña desde el panel.
+**Historial de vistas (2026-11-06), hecho y desplegado;** el usuario confirmó que funciona.
+
+**Siguiente:** hacer una grabación real de punta a punta desde la app de macOS contra producción
+(desde Linux ya está hecha). Después: abrir la app de macOS al iniciar sesión, mezclar el audio del
+sistema con el micrófono en macOS, script `instalar.sh` de macOS y videos privados («solo yo»).
 
 Al terminar una fase o tomar una decisión nueva, actualizar esta sección.
 
