@@ -214,6 +214,19 @@ input::placeholder { color: var(--neutro-600); }
 .detalle { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 32px; align-items: start; }
 .detalle .columna-video { grid-column: span 2; min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 @media (max-width: 760px) { .detalle .columna-video { grid-column: auto; } }
+/* El margen deja el título a la vista bajo la cabecera fija al paginar (#vistas); en móvil la cabecera ocupa tres filas. */
+.historial-vistas { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 96px; }
+@media (max-width: 760px) { .historial-vistas { scroll-margin-top: 220px; } }
+.historial-vistas h2 { margin: 0; font-size: 18px; font-weight: 600; font-family: var(--fuente); }
+.historial-vistas p { margin: 0; font-size: 14px; }
+.tabla-desplazable { overflow-x: auto; border: 1px solid var(--linea); border-radius: 18px; }
+.tabla-vistas { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabla-vistas th, .tabla-vistas td { padding: 11px 16px; text-align: left; vertical-align: top; }
+.tabla-vistas th { font-size: 13px; font-weight: 600; color: var(--neutro-400); border-bottom: 1px solid var(--linea); }
+.tabla-vistas tbody tr + tr td { border-top: 1px solid var(--linea); }
+.tabla-vistas td { color: var(--neutro-200); }
+.tabla-vistas td:last-child { overflow-wrap: anywhere; min-width: 180px; }
+.tabla-vistas .sin-corte { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .reproductor { width: 100%; aspect-ratio: 16/9; border-radius: var(--radio); background: #000; display: block; }
 /* Reproductor con controles propios (public/js/reproductor.js). Sin JS quedan los nativos. */
 .reproductor-marco { position: relative; border-radius: var(--radio); overflow: hidden; background: #000; }

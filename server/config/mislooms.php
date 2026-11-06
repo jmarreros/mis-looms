@@ -21,4 +21,7 @@ return [
 
     'video_prefix' => 'videos/',
     'thumb_prefix' => 'thumbs/',
+
+    // Las fechas se guardan en UTC; el historial de vistas y el correo las muestran en esta zona.
+    'zona_horaria' => env('MISLOOMS_ZONA_HORARIA', 'America/Lima'),
 ];

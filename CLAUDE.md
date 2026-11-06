@@ -36,6 +36,10 @@ y se obtiene un enlace público `/v/{slug}`. Un solo usuario.
   botón de pantalla completa (deshabilitado) además del propio. Sin JS quedan los nativos.
   Probado con Playwright en Chrome, Firefox y WebKit (para buscar en la barra, el servidor de
   pruebas debe admitir peticiones por rangos; `python -m http.server` no las admite).
+- Historial de vistas (tabla `vistas`, modelo `Vista`): cada visita anónima guarda IP, user agent y
+  fecha; el correo de la primera visita incluye esos datos. Se ve bajo el video **solo con sesión de
+  administrador**: la página pública no debe exponer las IP. Fechas en UTC, mostradas en
+  `MISLOOMS_ZONA_HORARIA` (por defecto `America/Lima`).
 - CSS y JS se enlazan con `?v=filemtime(...)` para que el navegador no use copias viejas.
 - Panel web: siempre en modo oscuro, según el diseño de Claude Design (sistema "Organic":
   fondo `#1c1a17`, acento terracota `#d67f48`, salvia de segundo color, títulos Caprasimo

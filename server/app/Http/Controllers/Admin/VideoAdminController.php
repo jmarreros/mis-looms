@@ -35,7 +35,7 @@ class VideoAdminController extends Controller
 
     public function show(Video $video)
     {
-        return view('admin.video', ['video' => $video]);
+        return view('admin.video', ['video' => $video, 'vistas' => $video->historialVistas()]);
     }
 
     public function update(Request $request, Video $video): RedirectResponse

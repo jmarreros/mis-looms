@@ -4,7 +4,9 @@ namespace App\Models;
 
 use App\Services\VideoStorage;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 class Video extends Model
@@ -27,6 +29,17 @@ class Video extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    public function vistas(): HasMany
+    {
+        return $this->hasMany(Vista::class);
+    }
+
+    /** Historial para el detalle, de la más reciente a la más antigua; al paginar vuelve a la tabla. */
+    public function historialVistas(): LengthAwarePaginator
+    {
+        return $this->vistas()->latest('id')->paginate(20, pageName: 'vistas')->fragment('vistas');
     }
 
     /** Slug corto de 12 caracteres aleatorios (a-z0-9): no adivinable, apto para la URL pública. */

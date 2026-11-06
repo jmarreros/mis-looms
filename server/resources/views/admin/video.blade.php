@@ -18,6 +18,38 @@
                     · {{ $video->views }} {{ $video->views === 1 ? 'vista' : 'vistas' }}
                 </span>
             </div>
+
+            {{-- Solo en esta vista, con sesión: las IP de los visitantes no deben verse en la página pública. --}}
+            <section class="historial-vistas" id="vistas">
+                <h2>Historial de vistas</h2>
+                @if ($vistas->isEmpty())
+                    <p class="suave">Aún no hay vistas registradas.</p>
+                @else
+                    <div class="tabla-desplazable">
+                        <table class="tabla-vistas">
+                            <thead>
+                                <tr><th>Fecha y hora</th><th>IP</th><th>Navegador</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($vistas as $vista)
+                                    <tr>
+                                        <td class="sin-corte">{{ $vista->fechaLegible() }}</td>
+                                        <td class="sin-corte">{{ $vista->ip ?? '—' }}</td>
+                                        <td title="{{ $vista->user_agent }}">{{ $vista->navegador() }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    {{ $vistas->links('pagination.mislooms') }}
+                @endif
+                @php($sinDatos = $video->views - $vistas->total())
+                @if ($sinDatos === 1)
+                    <p class="suave">1 vista es anterior a este historial y no tiene datos.</p>
+                @elseif ($sinDatos > 1)
+                    <p class="suave">{{ $sinDatos }} vistas son anteriores a este historial y no tienen datos.</p>
+                @endif
+            </section>
         </div>
 
         <aside class="lateral">

@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Video;
+use App\Models\Vista;
 use App\Services\VideoStorage;
 use App\Mail\PrimeraVisita;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Fake\FakeVideoStorage;
 use Tests\TestCase;
 
@@ -48,6 +50,14 @@ class PanelTest extends TestCase
             ->assertSee('noindex', false);
 
         $this->assertSame(1, $v->fresh()->views);
+    }
+
+    public function test_la_pagina_publica_muestra_el_contador_ya_actualizado(): void
+    {
+        $v = $this->video();
+
+        $this->get("/v/{$v->slug}")->assertOk()->assertSee('1 vista')->assertDontSee('0 vistas');
+        $this->get("/v/{$v->slug}")->assertOk()->assertSee('2 vistas');
     }
 
     public function test_el_reproductor_ofrece_ver_de_nuevo_con_y_sin_sesion(): void
@@ -97,6 +107,131 @@ class PanelTest extends TestCase
         $this->actingAs(User::factory()->create())->get("/v/{$v->slug}")->assertOk();
 
         $this->assertSame(0, $v->fresh()->views);
+    }
+
+    // --- Historial de vistas ---
+
+    private const AGENTE_CHROME = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+    private function visitar(Video $v, string $ip = '203.0.113.7', string $agente = self::AGENTE_CHROME)
+    {
+        return $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withHeader('User-Agent', $agente)
+            ->get("/v/{$v->slug}");
+    }
+
+    public function test_cada_visita_anonima_guarda_ip_navegador_y_fecha(): void
+    {
+        $v = $this->video();
+
+        $this->visitar($v)->assertOk();
+        $this->visitar($v, '198.51.100.9')->assertOk();
+
+        $this->assertSame(2, $v->vistas()->count());
+        $this->assertEqualsCanonicalizing(['203.0.113.7', '198.51.100.9'], $v->vistas()->pluck('ip')->all());
+        $this->assertSame(self::AGENTE_CHROME, $v->vistas()->first()->user_agent);
+        $this->assertNotNull($v->vistas()->first()->created_at);
+    }
+
+    public function test_no_se_puede_falsear_la_ip_con_una_cabecera(): void
+    {
+        $v = $this->video();
+
+        $this->withHeader('X-Forwarded-For', '1.2.3.4')->visitar($v)->assertOk();
+
+        $this->assertSame('203.0.113.7', $v->vistas()->first()->ip);
+    }
+
+    public function test_el_correo_incluye_ip_navegador_y_fecha(): void
+    {
+        Mail::fake();
+        User::factory()->create(['email' => 'admin@x.com']);
+        config(['mislooms.zona_horaria' => 'America/Lima']);
+        $v = $this->video();
+
+        $this->travelTo('2026-11-06 20:30:15 UTC');
+        $this->visitar($v)->assertOk();
+
+        Mail::assertSent(PrimeraVisita::class, function (PrimeraVisita $correo) {
+            $html = $correo->render();
+
+            return str_contains($html, '203.0.113.7')
+                && str_contains($html, 'Chrome 120 en macOS')
+                && str_contains($html, '06/11/2026 15:30:15');
+        });
+    }
+
+    public function test_el_administrador_ve_el_historial_y_el_publico_no(): void
+    {
+        $v = $this->video();
+        $this->visitar($v)->assertOk();
+
+        $this->flushHeaders();
+        $this->get("/v/{$v->slug}")->assertOk()->assertDontSee('203.0.113.7')->assertDontSee('Historial de vistas');
+
+        $admin = User::factory()->create();
+        $this->actingAs($admin)->get("/v/{$v->slug}")
+            ->assertOk()->assertSee('Historial de vistas')->assertSee('203.0.113.7')->assertSee('Chrome 120 en macOS');
+        $this->actingAs($admin)->get(route('admin.videos.show', $v))
+            ->assertOk()->assertSee('203.0.113.7');
+    }
+
+    public function test_la_visita_del_administrador_no_se_registra(): void
+    {
+        $v = $this->video();
+
+        $this->actingAs(User::factory()->create())->get("/v/{$v->slug}")->assertOk();
+
+        $this->assertSame(0, $v->vistas()->count());
+    }
+
+    public function test_el_historial_avisa_de_las_vistas_sin_datos_y_pagina(): void
+    {
+        $v = $this->video(['views' => 3]);
+        $admin = User::factory()->create();
+
+        $this->actingAs($admin)->get(route('admin.videos.show', $v))
+            ->assertSee('Aún no hay vistas registradas')->assertSee('3 vistas son anteriores');
+
+        foreach (range(1, 21) as $i) {
+            $v->vistas()->create(['ip' => "203.0.113.$i"]);
+        }
+        $v->update(['views' => 21]);
+
+        $this->actingAs($admin)->get(route('admin.videos.show', $v))
+            ->assertSee('203.0.113.21')->assertDontSee('203.0.113.1<', false)->assertSee('vistas=2#vistas', false);
+        $this->actingAs($admin)->get(route('admin.videos.show', $v).'?vistas=2')
+            ->assertSee('203.0.113.1<', false);
+    }
+
+    public function test_al_eliminar_el_video_se_borra_su_historial(): void
+    {
+        $v = $this->video();
+        $this->visitar($v)->assertOk();
+
+        $v->eliminarCompleto($this->almacen);
+
+        $this->assertDatabaseCount('vistas', 0);
+    }
+
+    #[DataProvider('agentes')]
+    public function test_reconoce_el_navegador(?string $agente, string $esperado): void
+    {
+        $this->assertSame($esperado, (new Vista(['user_agent' => $agente]))->navegador());
+    }
+
+    public static function agentes(): array
+    {
+        return [
+            'Chrome en Mac' => [self::AGENTE_CHROME, 'Chrome 120 en macOS'],
+            'Edge' => ['Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0', 'Edge 120 en Windows'],
+            'Firefox' => ['Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:121.0) Gecko/20100101 Firefox/121.0', 'Firefox 121 en Linux'],
+            'Safari en iPhone' => ['Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1', 'Safari 17 en iPhone'],
+            'Chrome en Android' => ['Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36', 'Chrome 120 en Android'],
+            'WhatsApp' => ['WhatsApp/2.23.20.0 A', 'WhatsApp (vista previa o robot)'],
+            'Sin reconocer' => ['curl/8.4.0', 'curl/8.4.0'],
+            'Vacío' => [null, 'Desconocido'],
+        ];
     }
 
     public function test_pagina_publica_404_si_no_esta_listo_o_no_existe(): void
